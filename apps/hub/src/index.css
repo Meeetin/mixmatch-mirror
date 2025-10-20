@@ -36,6 +36,7 @@
 
   /* Utility (feedback) */
   --color-emerald-500: #10b981; /* e.g., “correct” */
+  --color-crimson-700: #dc143c; /* default */
 }
 
 /* === Global base === */

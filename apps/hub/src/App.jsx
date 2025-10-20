@@ -671,7 +671,6 @@ function RevealBlock({ question, perOptionCounts }) {
 
   return (
     <div className="px-1 sm:px-2">
-      {/* Prompt on bare background */}
       <div className="font-display text-center leading-tight text-[clamp(1.5rem,4.5vw,3.5rem)] mb-5">
         <span className="bg-gradient-to-r from-gold-400 to-crimson-500 bg-clip-text text-transparent drop-shadow-[0_0_14px_rgba(255,215,0,.25)]">
           {question?.prompt ?? "—"}
@@ -702,7 +701,7 @@ function RevealBlock({ question, perOptionCounts }) {
                 <div
                   className={
                     "h-full transition-[width] duration-700 " +
-                    (isCorrect ? "bg-emerald-500" : "bg-crimson-500")
+                    (isCorrect ? "bg-emerald-500" : "bg-crimson-700")
                   }
                   style={{ width: pct + "%" }}
                 />
@@ -731,14 +730,12 @@ function FreeTextReveal({ question }) {
 
   return (
     <div className="px-1 sm:px-2 text-center">
-      {/* Title (bigger) */}
       <div className="font-display leading-tight text-[clamp(1.8rem,5.5vw,3.4rem)]">
         <span className="bg-gradient-to-r from-gold-400 to-crimson-500 bg-clip-text text-transparent drop-shadow-[0_0_14px_rgba(255,215,0,.25)]">
           {title}
         </span>
       </div>
 
-      {/* Artist (smaller) */}
       {artistName ? (
         <div className="mt-1 font-display leading-tight text-[clamp(1rem,3.5vw,2rem)] text-mist-200">
           {artistName}
@@ -811,7 +808,6 @@ function LeaderboardBlock({ leaderboard, compact = false }) {
     </Card>
   );
 }
-/* === Shared small component === */
 const LOGO_SRC = "/images/mixmatch-logo.png";
 
 function Logo({ size = "lg", onClick }) {
