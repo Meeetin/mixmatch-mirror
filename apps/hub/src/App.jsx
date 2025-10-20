@@ -305,11 +305,12 @@ useEffect(() => {
             ) : (
               <Card><div className="opacity-60">Preparing question…</div></Card>
             )}
-            <Card>
-              <div className="text-sm text-mist-300 text-center">
-                Answers: {progress.answered}/{progress.total}
-              </div>
-            </Card>
+            <Card className="text-center">
+              <div className="text-base md:text-lg text-mist-200">
+                Answers: <span className="font-mono tabular-nums">{progress.answered}/{progress.total}</span>
+            </div>
+          </Card>
+
           </StageCenter>
         </Shell>
       </TheaterBackground>
@@ -481,8 +482,8 @@ function Shell({
 
 function StageCenter({ children }) {
   return (
-    <div className="min-h-[70dvh] grid place-items-center">
-      <div className="w-full max-w-[780px] mx-auto flex flex-col items-stretch gap-4">
+    <div className="min-h-[80dvh] grid place-items-center px-2 sm:px-4">
+      <div className="w-full max-w-[1200px] mx-auto flex flex-col items-stretch gap-5 md:gap-6">
         {children}
       </div>
     </div>
@@ -630,90 +631,128 @@ function SecondaryButton({ children, className = "", ...props }) {
 
 function QuestionBlock({ question, showOptionsDimmed = false }) {
   return (
-    <Card>
-      <div className="font-display text-lg md:text-xl mb-3 leading-snug text-balance text-center">
-        {question?.prompt ?? "—"}
+    <div className="px-1 sm:px-2">
+      <div className="font-display text-center leading-tight text-[clamp(1.5rem,4.5vw,3.5rem)] mb-5">
+        <span className="bg-gradient-to-r from-gold-400 to-crimson-500 bg-clip-text text-transparent drop-shadow-[0_0_14px_rgba(255,215,0,.25)]">
+          {question?.prompt ?? "—"}
+        </span>
       </div>
+
       <ol
         className={[
-          "grid gap-2",
+          "grid gap-3 md:gap-4",
           "grid-cols-1 md:grid-cols-2",
-          // showOptionsDimmed ? "opacity-60" : "",
+          showOptionsDimmed ? "opacity-70" : "",
         ].join(" ")}
       >
         {(question?.options ?? []).map((opt, i) => (
-          <li key={i} className="rounded-lg px-3 py-2 bg-ink-800/70 break-words">
-            <div className="flex items-start gap-2">
-              <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-ink-700 font-medium">
+          <li
+            key={i}
+            className="rounded-xl px-4 py-3 md:px-5 md:py-4 bg-ink-800/80 ring-1 ring-white/10 shadow-md shadow-black/30"
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex h-8 w-8 md:h-9 md:w-9 shrink-0 items-center justify-center rounded-md bg-ink-700 font-semibold">
                 {String.fromCharCode(65 + i)}
               </span>
-              <span className="leading-snug">{opt}</span>
+              <span className="leading-snug text-lg md:text-xl">{opt}</span>
             </div>
           </li>
         ))}
       </ol>
-    </Card>
+    </div>
   );
 }
+
+
 
 function RevealBlock({ question, perOptionCounts }) {
   const correct = question?.correctIndex;
   const total = (perOptionCounts ?? []).reduce((a, b) => a + (b || 0), 0);
 
   return (
-    <Card>
-      <div className="font-display text-lg md:text-xl mb-3 leading-snug text-balance text-center">
-        {question?.prompt ?? "—"}
+    <div className="px-1 sm:px-2">
+      {/* Prompt on bare background */}
+      <div className="font-display text-center leading-tight text-[clamp(1.5rem,4.5vw,3.5rem)] mb-5">
+        <span className="bg-gradient-to-r from-gold-400 to-crimson-500 bg-clip-text text-transparent drop-shadow-[0_0_14px_rgba(255,215,0,.25)]">
+          {question?.prompt ?? "—"}
+        </span>
       </div>
-      <ol className="grid grid-cols-1 md:grid-cols-2 gap-2">
+
+      <ol className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
         {(question?.options ?? []).map((opt, i) => {
           const count = perOptionCounts?.[i] ?? 0;
           const pct = total ? Math.round((100 * count) / total) : 0;
           const isCorrect = i === correct;
+
           return (
             <li
               key={i}
               className={[
-                "rounded-lg px-3 py-2",
+                "rounded-xl px-4 py-3 md:px-5 md:py-4 ring-1 shadow-md",
                 isCorrect
-                  ? "bg-emerald-700/40 outline outline-2 outline-emerald-500/70"
-                  : "bg-ink-800/70",
+                  ? "bg-emerald-800/40 ring-emerald-500/50 shadow-emerald-900/30"
+                  : "bg-ink-800/80 ring-white/10 shadow-black/30",
               ].join(" ")}
             >
-              <div className="font-medium">
+              <div className="font-medium text-lg md:text-xl">
                 {String.fromCharCode(65 + i)}. {opt}
               </div>
-              <div className="mt-2 h-1.5 rounded bg-ink-700/70 overflow-hidden">
+
+              <div className="mt-3 h-2 rounded bg-ink-700/70 overflow-hidden">
                 <div
-                  className={"h-full " + (isCorrect ? "bg-emerald-500" : "bg-crimson-500")}
+                  className={
+                    "h-full transition-[width] duration-700 " +
+                    (isCorrect ? "bg-emerald-500" : "bg-crimson-500")
+                  }
                   style={{ width: pct + "%" }}
                 />
               </div>
-              <div className="text-xs text-mist-400 mt-1">
+
+              <div className="text-xs text-mist-300 mt-1">
                 {count} picks{total ? ` (${pct}%)` : ""}
               </div>
             </li>
           );
         })}
       </ol>
-    </Card>
+    </div>
   );
 }
+
+
 function FreeTextReveal({ question }) {
   const meta = question?.trackMeta || {};
-  const title = meta.title || "Unknown title";
-  const artist = meta.artist ? ` — ${meta.artist}` : "";
+  const title =
+    meta.title || meta.name || "Unknown title";
+  const artistName =
+    meta.artist ||
+    (Array.isArray(meta.artists) ? meta.artists.filter(Boolean).join(", ") : "") ||
+    "";
+
   return (
-    <Card>
-      <div className="text-center">
-        <div className="font-display text-xl md:text-2xl">{title}{artist}</div>
-        <div className="mt-2 text-mist-400">
-          Players who typed the exact title get a point.
-        </div>
+    <div className="px-1 sm:px-2 text-center">
+      {/* Title (bigger) */}
+      <div className="font-display leading-tight text-[clamp(1.8rem,5.5vw,3.4rem)]">
+        <span className="bg-gradient-to-r from-gold-400 to-crimson-500 bg-clip-text text-transparent drop-shadow-[0_0_14px_rgba(255,215,0,.25)]">
+          {title}
+        </span>
       </div>
-    </Card>
+
+      {/* Artist (smaller) */}
+      {artistName ? (
+        <div className="mt-1 font-display leading-tight text-[clamp(1rem,3.5vw,2rem)] text-mist-200">
+          {artistName}
+        </div>
+      ) : null}
+
+      <div className="mt-2 text-mist-300">
+        Players who typed the exact title get a point.
+      </div>
+    </div>
   );
 }
+
+
 
 function LeaderboardBlock({ leaderboard, compact = false }) {
   const wrap = compact
