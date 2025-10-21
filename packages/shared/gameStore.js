@@ -133,19 +133,18 @@ export const makeGameStore = (serverUrl) => {
       // in actions return {...}, add:
       seedTracks: (tracks, metaOrCb, maybeCb) => {
       const code = get().code;
-       let meta, cb;
+      const [meta, cb] =
+          typeof metaOrCb === "function"
+            ? [undefined, metaOrCb]
+            : [metaOrCb, (typeof maybeCb === "function" ? maybeCb : undefined)];
 
-      if (typeof metaOrCb === "function") {
-        cb = metaOrCb;
-        } else {
-            meta = metaOrCb;
-          cb = typeof maybeCb === "function" ? maybeCb : undefined;
-        }
+        const payload = {
+          code,
+          tracks,
+          ...(meta && typeof meta === "object" ? { meta } : {}),
+        };
 
-        const payload = { code, tracks };
-        if (meta && typeof meta === "object") payload.meta = meta;
-
-      s.emit("game:seedTracks", payload, (res) => cb?.(res));
+        s.emit("game:seedTracks", payload, (res) => cb?.(res));
       },
 
       // PLAYER: join (no auto-rejoin, no storage; always manual)
@@ -187,26 +186,25 @@ export const makeGameStore = (serverUrl) => {
       // game over controls
       playAgain: (arg1, arg2, arg3) => {
         const code = get().code;
-        let tracks, meta, cb;
+        const [tracks, meta, cb] = Array.isArray(arg1)
+          ? [
+              arg1,
+              typeof arg2 === "function" ? undefined : arg2,
+              typeof arg2 === "function" ? arg2 : (typeof arg3 === "function" ? arg3 : undefined),
+            ]
+          : typeof arg1 === "function"
+            ? [undefined, undefined, arg1]
+            : [
+                undefined,
+                arg1,
+                typeof arg2 === "function" ? arg2 : undefined,
+              ];
 
-        if (Array.isArray(arg1)) {
-          tracks = arg1;
-        if (typeof arg2 === "function") {
-          cb = arg2;
-        } else {
-          meta = arg2;
-          cb = typeof arg3 === "function" ? arg3 : undefined;
-        }
-        } else if (typeof arg1 === "function") {
-        cb = arg1;
-        } else if (arg1 && typeof arg1 === "object") {
-        meta = arg1;
-        cb = typeof arg2 === "function" ? arg2 : undefined;
-        }
-
-        const payload = { code };
-        if (tracks) payload.tracks = tracks;
-        if (meta) payload.meta = meta;
+        const payload = {
+          code,
+          ...(tracks ? { tracks } : {}),
+          ...(meta ? { meta } : {}),
+        };
 
         s.emit("game:playAgain", payload, (res) => cb?.(res));
     },
