@@ -1,7 +1,6 @@
 // apps/hub/src/spotify/spotifyClient.js
 import {
   getAccessToken,
-  getPlaylistData,
   getPreferredDeviceId,
   setPreferredDeviceId,
 } from "./spotifyAuth.js";
@@ -59,77 +58,22 @@ function pickBestDevice(devices) {
 }
 
 async function ensureDeviceId(candidate = null) {
-  const existing = candidate || getPreferredDeviceId();
-  if (existing) return existing;
+  const stored = candidate || getPreferredDeviceId();
 
-  const devices = await listDevices();
-  const best = pickBestDevice(devices);
-  if (!best) {
-    // User must open Spotify once so the device appears in /me/player/devices
-    throw new Error("Open Spotify on your computer once to activate it.");
+  const devices = await listDevices(); // GET /me/player/devices
+  if (!Array.isArray(devices) || devices.length === 0) {
+    throw new Error("Open Spotify on any device once so it appears in Connect.");
   }
+
+  const ids = new Set(devices.map(d => d.id));
+  if (stored && ids.has(stored)) {
+    return stored; // still valid
+  }
+
+  const best = pickBestDevice(devices);
+  if (!best) throw new Error("No available Spotify device.");
   setPreferredDeviceId(best.id);
   return best.id;
-}
-
-
-/** Accept plain id, spotify:playlist:URI, or open.spotify.com URL. */
-function normPlaylistId(input) {
-  const s = String(input || "").trim();
-  if (s.startsWith("spotify:playlist:")) return s.split(":").pop();
-  const m = s.match(/open\.spotify\.com\/playlist\/([A-Za-z0-9]{22})/);
-  return m ? m[1] : s;
-}
-
-function normalizeTrack(t) {
-  if (!t || !t.id) return null;
-  const artists = (t.artists || []).map(a => a?.name).filter(Boolean);
-  return {
-    id: t.id,
-    title: t.name || "",
-    artist: artists.join(", "),
-    uri: t.uri || null,
-    previewUrl: t.preview_url || null,
-  };
-}
-
-export async function getPlaylistTracksLow(playlistId, { limit = 100 } = {}) {
-  const token = await getAccessToken();
-  if (!token) throw new Error("No Spotify token");
-  const id = normPlaylistId(playlistId);
-  const raw = await getPlaylistData(token, id);
-  const out = raw.map(normalizeTrack).filter(Boolean);
-  return out.slice(0, limit);
-}
-
-export async function collectTracksFromPlaylists(   
-// We use let only inside the Fisher–Yates shuffle to keep it O(n) time.
-// These let indices are local to the loop and never mutate shared application state.
-
-  playlistIds, 
-  { perList = 100, maxTotal = 200, shuffle = true } = {}
-) {
-  const ids = Array.from(new Set((playlistIds || []).map(normPlaylistId)));
-  let bag = [];
-  for (const id of ids) {
-    try {
-      const chunk = await getPlaylistTracksLow(id, { limit: perList });
-      bag.push(...chunk);
-    } catch (e) {
-      console.warn("playlist fetch failed", id, e);
-    }
-  }
-  // de-dup by track id
-  const seen = new Set();
-  const dedup = bag.filter(t => (t.id && !seen.has(t.id)) ? (seen.add(t.id), true) : false);
-
-  if (shuffle) {
-    for (let i = dedup.length - 1; i > 0; i--) {
-      const j = (Math.random() * (i + 1)) | 0;
-      [dedup[i], dedup[j]] = [dedup[j], dedup[i]];
-    }
-  }
-  return dedup.slice(0, maxTotal);
 }
 
 export async function getPlaybackState() {
