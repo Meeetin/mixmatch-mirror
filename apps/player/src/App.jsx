@@ -45,9 +45,9 @@ export default function Player() {
   const computedFirst = firstPlayerId || (players?.length ? players[0]?.id : null);
   const isFirst = selfId && computedFirst && selfId === computedFirst;
 
-  /* ---------- Question visibility gate (no-flash + per-question wait) ---------- */
+  /* ---------- Question visibility ---------- */
   const prevStageRef = useRef(stage);
-  const gateRef = useRef(false);         // true => hide question synchronously
+  const gateRef = useRef(false);
   const gateTimerRef = useRef(null);
   const [, forceTick] = useState(0);
 
@@ -79,7 +79,7 @@ export default function Player() {
     return () => clearTimeout(gateTimerRef.current);
   }, [stage, questionKey]);
 
-  /* ---------- Start from Player: reuse playAgain path (Hub reseeds via Spotify) ---------- */
+  /* ---------- Start from Player: reuse playAgain path (Hub reseeds via Spotify) currently not working, fix. ---------- */
   const hasPick = !!(getConfig()?.selectedPlaylistIDs?.length);
   const canStart = stage === "lobby" && hasPick;
 
@@ -92,7 +92,6 @@ export default function Player() {
     });
   }, [playAgain]);
 
-  // Track picked answer locally
   const [picked, setPicked] = useState(null);
   useEffect(() => {
     if (stage !== "question") setPicked(null);
@@ -232,7 +231,6 @@ export default function Player() {
             {question?.prompt ?? "—"}
           </div>
 
-          {/* Options grid OR free-text input */}
       {isText ? (
         <div className="flex items-stretch gap-2">
           <input
@@ -265,7 +263,6 @@ export default function Player() {
           </button>
         </div>
       ) : (
-        /* Options grid — phone-first (1 col), becomes 2 cols on wider screens */
         <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
           {opts.map((opt, i) => {
             const disabled = !canAnswer || picked != null;
@@ -343,7 +340,7 @@ export default function Player() {
   );
 
 } else if (stage === "reveal" && question?.correctIndex != null) {
-  // MCQ reveal (unchanged)
+  // MCQ reveal
   main = (
     <Card title="Correct answer">
       <RevealBars question={question} />
@@ -369,7 +366,6 @@ export default function Player() {
 
       {main}
 
-      {/* Continue control for first player */}
       {showContinue && (
         <PrimaryButton onClick={advance} className="w-full mt-2">Continue</PrimaryButton>
       )}
@@ -384,7 +380,7 @@ export default function Player() {
   );
 }
 
-/* ==================== UI bits (ink/mist/gold/crimson) ==================== */
+/* ==================== UI bits ==================== */
 
 function Screen({ children }) {
   return (
@@ -584,7 +580,7 @@ function friendlyJoinError(code) {
     default: return "Couldn’t join. Please try again.";
   }
 }
-// ---- Fuzzy helpers (client-side) ----
+
 function stripDiacritics(s) {
   try { return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
   catch { return String(s || ""); }

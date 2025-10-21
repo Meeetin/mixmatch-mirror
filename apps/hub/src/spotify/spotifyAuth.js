@@ -73,7 +73,6 @@ export async function requestToken() {
         storedState: localStorage.getItem('spotify_auth_state')
     });*/
 
-    // If Spotify sent back an error:
     const err = url.searchParams.get("error");
     if (err) throw new Error("Spotify auth error: " + err);
   
@@ -129,14 +128,8 @@ export function hasSpotifyToken() {
     return !!t && Date.now() < ea;
 }
 
-// Before refresh token, might need later
-/*
-export async function getAccessToken() {
-    // (Optional: add refresh flow here later if token expired)
-    return hasSpotifyToken() ? localStorage.getItem("access_token") : null;
-}*/
 
-// Buffer to avoid edge-of-expiry
+
 const EXPIRY_SKEW_MS = 5000;
 
 export async function getAccessToken() {
@@ -148,7 +141,6 @@ export async function getAccessToken() {
     return token;
   }
 
-  // Try to refresh if we can.
   const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken) return null;
 
@@ -195,9 +187,7 @@ async function readJsonOrText(resp) {
 
 // API call for fetching playlist data
 export async function getPlaylistData(accessToken, playlistID) {
-    // url for get playlist API call
     const url = new URL(`https://api.spotify.com/v1/playlists/${playlistID}/tracks`);
-    // "fields" filters to only give wanted playlist info
     url.searchParams.set(
         "fields", 
         "items(track(id,uri,preview_url,name,artists(name),album(name,images)))"
@@ -206,7 +196,6 @@ export async function getPlaylistData(accessToken, playlistID) {
     const resp = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
     });
-    // const data = await resp.json();
     const { data, raw } = await readJsonOrText(resp);
     if (!resp.ok) {
         const msg =
@@ -223,7 +212,6 @@ export async function getPlaylistData(accessToken, playlistID) {
 // Device preference
 const PREFERRED_DEVICE_KEY = "spotify_preferred_device_id";
 
-/* Returns the last chosen deviceId (or null if unset). */
 export function getPreferredDeviceId() {
   try {
     return localStorage.getItem(PREFERRED_DEVICE_KEY) || null;
@@ -232,7 +220,6 @@ export function getPreferredDeviceId() {
   }
 }
 
-/* Persist a preferred deviceId (pass null/undefined to clear). */
 export function setPreferredDeviceId(deviceId) {
   try {
     if (!deviceId) {

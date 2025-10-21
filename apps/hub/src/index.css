@@ -1,48 +1,39 @@
-/* === Fonts === */
 @import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Archivo+Black&display=swap");
 
-/* Tailwind v4 core */
 @import "tailwindcss";
 
-/* === Theme tokens (Tailwind v4 @theme) ===
-   Warm charcoal backgrounds + neutral-warm text.
-   Your existing utilities keep working: bg-ink-950, text-mist-100, bg-crimson-500, outline-gold-400, etc.
-*/
 @theme {
   /* Fonts */
   --font-sans: "Fredoka", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
   --font-display: "Archivo Black", "Fredoka", system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
 
-  /* --- Warm Charcoal palette (no blue) --- */
-  /* Backgrounds */
-  --color-ink-950: #0c0b0b;  /* near-black, warm */
-  --color-ink-900: #111010;  /* page/elevated bg */
-  --color-ink-800: #171515;  /* surfaces */
-  --color-ink-700: #201d1d;  /* subtle element bg */
+  /* Surfaces */
+  --color-ink-950: #0c0b0b;
+  --color-ink-900: #111010;
+  --color-ink-800: #171515;
+  --color-ink-700: #201d1d;
 
-  /* Text (neutral-warm) */
-  --color-mist-100: #eee9e6; /* primary text */
-  --color-mist-300: #cfc6c0; /* secondary */
-  --color-mist-400: #b2a8a2; /* muted labels */
+  /* Text */
+  --color-mist-100: #eee9e6;
+  --color-mist-300: #cfc6c0;
+  --color-mist-400: #b2a8a2;
 
-  /* Primary/CTA (theater crimson) */
-  --color-crimson-600: #8f1626; /* pressed/active */
-  --color-crimson-500: #bf9b30; /* default */
-  --color-crimson-400: #f5d77a; /* hover */
+  /* Primary */
+  --color-crimson-700: #dc143c;
+  --color-crimson-600: #8f1626;
+  --color-crimson-500: #bf9b30; /* gold */
+  --color-crimson-400: #f5d77a; /* gold hover */
 
-  /* Accents (subtle gold for focus/highlights) */
+  /* Gold accents */
   --color-gold-500: #bf9b30;
   --color-gold-400: #f5d77a;
 
-  /* Utility (feedback) */
-  --color-emerald-500: #10b981; /* e.g., “correct” */
-  --color-crimson-700: #dc143c; /* default */
+  /* Feedback */
+  --color-emerald-500: #10b981;
 }
 
-/* === Global base === */
-html, body, #root {
-  height: 100%;
-}
+/* Base */
+html, body, #root { height: 100%; }
 
 html, body {
   background: var(--color-ink-950);
@@ -53,17 +44,18 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Optional: selection color */
+/* Selection */
 ::selection {
+  /* use true crimson since 500 is gold by design */
   background: color-mix(in oklab, var(--color-crimson-500) 35%, black);
-  color: white;
+  color: #fff;
 }
 
-/* Optional: links tuned for dark UI */
+/* Links */
 a { color: var(--color-gold-400); }
 a:hover { color: var(--color-gold-500); }
 
-/* Optional: focus ring fallback */
+/* Focus ring */
 :focus-visible {
   outline: 2px solid var(--color-gold-400);
   outline-offset: 2px;

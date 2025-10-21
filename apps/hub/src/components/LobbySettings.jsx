@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGameStore } from "../store";
 
-// Use your working path or alias here:
 import dictPlaylistID from "../../../../packages/shared/PlayListIDs.js";
 
-/** ----- Genres (explicit allow-list; K-pop, Christmas, LOL omitted) ----- */
+
 const GENRE_LABELS = {
   plRock: "Rock",
   plClassicRock: "Classic Rock",
@@ -18,16 +17,13 @@ const GENRE_LABELS = {
 };
 const GENRE_KEYS = Object.keys(GENRE_LABELS);
 
-/** ----- Decades in shared list ----- */
 const DECADE_KEYS = ["pl60s", "pl70s", "pl80s", "pl90s", "pl00s", "pl10s"];
 
-/** Build lists from the shared dictionary */
 function buildGenres() {
   const rows = GENRE_KEYS
     .map((key) => ({ key, id: dictPlaylistID[key], label: GENRE_LABELS[key] }))
     .filter((r) => !!r.id);
 
-  // De-duplicate by playlist ID
   const byId = new Map();
   for (const r of rows) if (!byId.has(r.id)) byId.set(r.id, r);
   return Array.from(byId.values());
@@ -65,22 +61,18 @@ export default function LobbySettings() {
   }));
   if (stage !== "lobby") return null;
 
-  const isHost = true; // hub acts as host
+  const isHost = true;
   const disabled = !isHost;
 
-  // Data sources
   const genres = useMemo(buildGenres, []);
   const decades = useMemo(buildDecades, []);
 
-  // Existing settings → local UI state
   const [maxQuestions, setMaxQuestions] = useState(config.maxQuestions);
 
-  // UI uses seconds; server stores ms → convert on read/write
   const [durationSec, setDurationSec] = useState(
     Math.round((config.defaultDurationMs ?? 20000) / 1000)
   );
 
-  // Default: none selected. If config already has saved picks, hydrate from it.
   const inConfig = Array.isArray(config?.selectedPlaylistIDs) ? config.selectedPlaylistIDs : [];
   const [selGenres, setSelGenres] = useState(
     inConfig.filter((id) => genres.some((g) => g.id === id))
@@ -108,7 +100,6 @@ export default function LobbySettings() {
     const payload = buildPayload();
     const key = JSON.stringify(payload);
     if (firstRunRef.current) {
-      // Skip initial effect run to avoid clobbering server defaults
       firstRunRef.current = false;
       lastSentRef.current = key;
       return;
@@ -120,12 +111,11 @@ export default function LobbySettings() {
       setSaving(false);
       if (res?.ok) lastSentRef.current = key;
     });
-  }, 350); // debounce ~350ms
+  }, 350);
 
   // Auto-save whenever inputs/selections change
   useEffect(() => {
     doSave();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxQuestions, durationSec, selGenres, selDecades]);
 
   const toggle = (id, setter) =>
@@ -137,7 +127,6 @@ export default function LobbySettings() {
   return (
     <div className="w-full max-w-md space-y-4">
       <div>
-        {/* Two inputs side-by-side, perfectly aligned */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
           <label className="block">
             <span className="text-sm text-mist-300 block min-h-[40px]">
@@ -153,7 +142,6 @@ export default function LobbySettings() {
                 onChange={(e) => setMaxQuestions(e.target.value)}
                 disabled={disabled}
               />
-              {/* invisible suffix to match layout with seconds field */}
               <span className="px-3 py-2 text-mist-300 rounded-r-xl select-none opacity-0">s</span>
             </div>
           </label>
@@ -177,10 +165,8 @@ export default function LobbySettings() {
             </div>
           </label>
         </div>
-        {/* Status text removed per request (no "Saved ✓"). */}
       </div>
 
-      {/* Genres */}
       <section>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm text-mist-300">Genres</h3>
@@ -226,11 +212,9 @@ export default function LobbySettings() {
         </div>
       </section>
 
-      {/* Decades */}
       <section>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm text-mist-300">Decades</h3>
-          {/* Re-added: Select all / Clear for decades */}
           <div className="flex items-center gap-2 text-xs">
             <button
               onClick={() => selectAll(decades, setSelDecades)}

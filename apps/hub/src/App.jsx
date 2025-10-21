@@ -1,17 +1,13 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom"; // Router
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom"; // Router
 import SpotifyCallback from "./SpotifyCallback";                  // Handles token exchange
 import { useEffect, useRef, useState, useCallback } from "react";
 import { makeTrackList } from "./spotify/mediaEngine";
 import { redirectToAuth, hasSpotifyToken } from "./spotify/spotifyAuth.js";
-import { collectTracksFromPlaylists, startPlayback, pausePlayback, attachPlaybackController  } from "./spotify/spotifyClient.js"; // Spotify API helpers
-import dictPlaylistID from "../../../packages/shared/PlayListIDs.js"; // adjust path if needed
+import { attachPlaybackController } from "./spotify/spotifyClient.js"; // pruned to what's used
+import dictPlaylistID from "../../../packages/shared/PlayListIDs.js";
 import { useGameStore } from "./store";
-//import { useGame } from "../../../packages/shared/gameStore.js";
 import { getSocket } from "../../../packages/shared/socket.js";
 
-// If you published the shared package with this name (recommended):
-// import { makeGameStore } from "@mixmatch/shared/gameStore";
-// Temporary relative imports (keep your own paths)
 import TheaterBackground from "./components/TheaterBackground.jsx";
 import GameHistory from "./components/GameHistory.jsx";
 import SpotlightOverlay from "./components/SpotlightOverlay.jsx";
@@ -33,7 +29,7 @@ function Hub() {
     perOptionCounts = [],
     leaderboard = [],
     createRoom, startGame, nextQuestion, playAgain, toLobby, getConfig,
-    seedTracks, setTrackList, // NEW (add this action in your store to emit game:seedTracks)
+    seedTracks, setTrackList,
   } = useGame();
 
   /* ---------------- Audio  ---------------- */
@@ -49,7 +45,7 @@ function Hub() {
   const onCreate = useCallback(() => {
     if (!hasSpotifyToken()) {
       localStorage.setItem("pending_action", "createRoom");
-      redirectToAuth(); // navigates away
+      redirectToAuth();
       return;
     }
     createRoom();
@@ -67,7 +63,7 @@ function Hub() {
     // pass meta so the server remembers playlist + count
     seedTracks(tracks, { playlistId, numTracks });
     startGame();
-  }, []);
+  }, [getConfig, seedTracks, startGame]);
 
   const onPlayAgain = useCallback(async () => {
     const cfg = getConfig();
@@ -79,7 +75,7 @@ function Hub() {
     const tracks = await makeTrackList(playlistId, numTracks);
     seedTracks(tracks, { playlistId, numTracks });
     startGame();
-  }, []);
+  }, [getConfig, seedTracks, startGame]);
 
   useEffect(() => {
     const s = getSocket();
@@ -99,7 +95,7 @@ function Hub() {
 
     s.on("server:requestReseed", onRequestReseed);
     return () => s.off("server:requestReseed", onRequestReseed);
-  }, []);
+  }, [setTrackList]);
 
   useEffect(() => {
     const pending = localStorage.getItem("pending_action");
@@ -175,7 +171,7 @@ function Hub() {
       setAllowFlicker(false);
       return;
     }
-  }, [stage, question?.id]);
+  }, [stage, question?.id, curtainsEnabled]);
 
   const isFlicker = stage === "question" && !spotlightEverSettled && allowFlicker;
 
@@ -184,127 +180,214 @@ function Hub() {
     stage === "question" && (curtainRunning || !settledForRender);
 
   /* ---------------- Stage router ---------------- */
-  let content = null;
-
-  if (stage === "idle") {
-    content = <Landing onCreate={onCreate} />;
-  } else if (stage === "lobby") {
-    const hasPick = !!(getConfig()?.selectedPlaylistIDs?.length);
-    const canStart = !!code && players.length >= 1 && hasPick;
-
-    content = (
-  <TheaterBackground bgUrl={THEATRE_BG}>
-  <Shell
-    wide
-    title={
-      <span className="inline-flex items-baseline gap-2">
-        <span className="uppercase text-xs tracking-widest text-mist-400">Room Code</span>
-        <code className="font-mono tracking-widest text-3xl md:text-4xl">{code || "—"}</code>
-      </span>
+  const renderMain = (s) => {
+    if (s === "idle") {
+      return <Landing onCreate={onCreate} />;
     }
-    headerRight={<StageBadge stage={stage} />}
-    headerCenter={<Logo size="sm" onClick={() => window.location.reload()} />}
-  >
-    <div className="flex flex-col min-h-[70dvh]">
-      <div className="grow">
-        <div className="mx-auto w-full max-w-[900px] grid gap-2 items-start grid-cols-1 md:grid-cols-2">
-          <Card title={`Players (${players.length})`}>
-            <PlayerGrid players={players} hostId={hostId} />
-            {players.length === 0 && <EmptyNote>No players yet…</EmptyNote>}
-          </Card>
-          <Card title="Game settings">
-            <div className="space-y-4 w-full">
-              <LobbySettings />
+
+    if (s === "lobby") {
+      const hasPick = !!(getConfig()?.selectedPlaylistIDs?.length);
+      return (
+        <TheaterBackground bgUrl={THEATRE_BG}>
+          <Shell
+            wide
+            title={
+              <span className="inline-flex items-baseline gap-2">
+                <span className="uppercase text-xs tracking-widest text-mist-400">Room Code</span>
+                <code className="font-mono tracking-widest text-3xl md:text-4xl">{code || "—"}</code>
+              </span>
+            }
+            headerRight={<StageBadge stage={s} />}
+            headerCenter={
+              <Link to="/"><Logo size="sm" /></Link>
+            }
+          >
+            <div className="flex flex-col min-h-[70dvh]">
+              <div className="grow">
+                <div className="mx-auto w-full max-w-[900px] grid gap-2 items-start grid-cols-1 md:grid-cols-2">
+                  <Card title={`Players (${players.length})`}>
+                    <PlayerGrid players={players} hostId={hostId} />
+                    {players.length === 0 && <EmptyNote>No players yet…</EmptyNote>}
+                  </Card>
+                  <Card title="Game settings">
+                    <div className="space-y-4 w-full">
+                      <LobbySettings />
+                    </div>
+                  </Card>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <div className="w-full flex justify-center">
+                  <PrimaryButton
+                    onClick={onStart}
+                    disabled={!(code && players.length >= 1 && getConfig()?.selectedPlaylistIDs?.length)}
+                    className="text-2xl md:text-3xl px-8 md:px-10 py-4 md:py-5 rounded-3xl shadow-xl shadow-black/30"
+                  >
+                    Start game
+                  </PrimaryButton>
+                </div>
+
+                <div className="w-full mt-2">
+                  <GameHistory />
+                </div>
+              </div>
             </div>
-          </Card>
-        </div>
-      </div>
+          </Shell>
+        </TheaterBackground>
+      );
+    }
 
-      <div className="mt-4">
-        <div className="w-full flex justify-center">
-          <PrimaryButton
-            onClick={onStart}
-            disabled={!(code && players.length >= 1 && getConfig()?.selectedPlaylistIDs?.length)}
-            className="text-2xl md:text-3xl px-8 md:px-10 py-4 md:py-5 rounded-3xl shadow-xl shadow-black/30"
-            >
-            Start game
-          </PrimaryButton>
-        </div>
+    if (s === "question") {
+      const shouldAnimateCurtains = curtainRunning;
+      const curtainCycleKey = shouldAnimateCurtains ? curtainKey : -1;
 
-        <div className="w-full mt-2">
-          <GameHistory />
-        </div>
-      </div>
-    </div>
-  </Shell>
-</TheaterBackground>
-);
-  } else if (stage === "question") {
-    const shouldAnimateCurtains = curtainRunning;
-    const curtainCycleKey = shouldAnimateCurtains ? curtainKey : -1;
+      return (
+        <TheaterBackground bgUrl={THEATRE_BG}>
+          {curtainsEnabled && (
+            <CurtainOverlay
+              cycleKey={curtainCycleKey}
+              topOffsetPx={0}
+              edgePx={72}
+              onCycleStart={() => setCurtainRunning(true)}
+              onCycleEnd={() => {
+                setCurtainRunning(false);
+                setAllowFlicker(true);
+              }}
+            />
+          )}
 
-    content = (
-      <TheaterBackground bgUrl={THEATRE_BG}>
-        {curtainsEnabled && (
-          <CurtainOverlay
-            cycleKey={curtainCycleKey}
-            topOffsetPx={0}
-            edgePx={72}
-            onCycleStart={() => setCurtainRunning(true)}
-            onCycleEnd={() => {
-              setCurtainRunning(false);
-              setAllowFlicker(true);
+          <SpotlightOverlay
+            active={spotlightActive}
+            flicker={isFlicker}
+            onSettled={() => {
+              setSpotlightEverSettled(true);
+              setAllowFlicker(false);
             }}
+            holdOpacity={0.6}
+            center={[0.5, 0.5]}
+            duration={1.6}
+            exitDuration={0.8}
           />
-        )}
 
-        <SpotlightOverlay
-          active={spotlightActive}
-          flicker={isFlicker}
-          onSettled={() => {
-            setSpotlightEverSettled(true);
-            setAllowFlicker(false);
-          }}
-          holdOpacity={0.6}
-          center={[0.5, 0.5]}
-          duration={1.6}
-          exitDuration={0.8}
-        />
-
-        <Shell
-          title={
-            <code className="font-mono tracking-widest text-xl md:text-2xl">
-              {code || "—"}
-            </code>
-          }
-          headerRight={<StageBadge stage={stage} seconds={seconds} />}
-          headerCenter={<Logo size="sm" onClick={() => window.location.reload()} />}
-          bodyHidden={questionStageHidden}
-        >
-          <StageCenter>
-            {settledForRender ? (
-              <>
-                <QuestionBlock question={question} showOptionsDimmed />
-              </>
-            ) : (
-              <Card>
-                <div className="opacity-60">Preparing question…</div>
+          <Shell
+            title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
+            headerRight={<StageBadge stage={s} seconds={seconds} />}
+            headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+            bodyHidden={questionStageHidden}
+          >
+            <StageCenter>
+              {settledForRender ? (
+                <>
+                  <QuestionBlock question={question} showOptionsDimmed />
+                </>
+              ) : (
+                <Card>
+                  <div className="opacity-60">Preparing question…</div>
+                </Card>
+              )}
+              <Card className="text-center">
+                <div className="text-base md:text-lg text-mist-200">
+                  Answers:{" "}
+                  <span className="font-mono tabular-nums">
+                    {progress.answered}/{progress.total}
+                  </span>
+                </div>
               </Card>
-            )}
-            <Card className="text-center">
-              <div className="text-base md:text-lg text-mist-200">
-                Answers:{" "}
-                <span className="font-mono tabular-nums">
-                  {progress.answered}/{progress.total}
-                </span>
+            </StageCenter>
+          </Shell>
+        </TheaterBackground>
+      );
+    }
+
+    if (s === "reveal") {
+      return (
+        <TheaterBackground bgUrl={THEATRE_BG}>
+          {curtainsEnabled && <CurtainOverlay cycleKey={-1} topOffsetPx={0} edgePx={72} />}
+          <SpotlightOverlay
+            active={spotlightActive}
+            flicker={false}
+            holdOpacity={0.6}
+            center={[0.5, 0.5]}
+            duration={1.6}
+            exitDuration={0.8}
+          />
+          <Shell
+            title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
+            headerRight={<StageBadge stage={s} seconds={seconds} label="Reveal ends in" />}
+            headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+          >
+            <StageCenter>
+              {question?.type === "track-recognition" ? (
+                <FreeTextReveal question={question} />
+              ) : (
+                <RevealBlock question={question} perOptionCounts={perOptionCounts} />
+              )}
+            </StageCenter>
+          </Shell>
+        </TheaterBackground>
+      );
+    }
+
+    if (s === "result") {
+      return (
+        <TheaterBackground bgUrl={THEATRE_BG}>
+          {curtainsEnabled && <CurtainOverlay cycleKey={-1} topOffsetPx={0} edgePx={72} />}
+          <SpotlightOverlay
+            active={spotlightActive}
+            flicker={false}
+            holdOpacity={0.6}
+            center={[0.5, 0.5]}
+            duration={1.6}
+            exitDuration={0.8}
+          />
+          <Shell
+            title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
+            headerRight={<StageBadge stage={s} seconds={seconds} label="Next question in" />}
+            headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+          >
+            <StageCenter>
+              <LeaderboardBlock leaderboard={leaderboard} compact />
+              {typeof nextQuestion === "function" && (
+                <div className="mt-2">
+                  <SecondaryButton onClick={nextQuestion}>Next now</SecondaryButton>
+                </div>
+              )}
+            </StageCenter>
+          </Shell>
+        </TheaterBackground>
+      );
+    }
+
+    if (s === "gameover") {
+      return (
+        <TheaterBackground bgUrl={THEATRE_BG}>
+          {curtainsEnabled && <CurtainOverlay cycleKey={-1} topOffsetPx={0} edgePx={72} />}
+          <SpotlightOverlay
+            active={spotlightActive}
+            flicker={false}
+            holdOpacity={0.6}
+            center={[0.5, 0.5]}
+            duration={1.6}
+            exitDuration={0.8}
+          />
+          <Shell
+            title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
+            headerRight={<StageBadge stage={s} />}
+            headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+          >
+            <StageCenter>
+              <LeaderboardBlock leaderboard={leaderboard} />
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <SecondaryButton onClick={toLobby}>Back to lobby</SecondaryButton>
               </div>
-            </Card>
-          </StageCenter>
-        </Shell>
-      </TheaterBackground>
-    );
-  } else if (stage === "reveal") {
-    content = (
+            </StageCenter>
+          </Shell>
+        </TheaterBackground>
+      );
+    }
+
+    return (
       <TheaterBackground bgUrl={THEATRE_BG}>
         {curtainsEnabled && <CurtainOverlay cycleKey={-1} topOffsetPx={0} edgePx={72} />}
         <SpotlightOverlay
@@ -316,98 +399,9 @@ function Hub() {
           exitDuration={0.8}
         />
         <Shell
-          title={
-            <code className="font-mono tracking-widest text-xl md:text-2xl">
-              {code || "—"}
-            </code>
-          }
-          headerRight={<StageBadge stage={stage} seconds={seconds} label="Reveal ends in" />}
-          headerCenter={<Logo size="sm" onClick={() => window.location.reload()} />}
-        >
-          <StageCenter>
-            {question?.type === "track-recognition" ? (
-              <FreeTextReveal question={question} />
-            ) : (
-              <RevealBlock question={question} perOptionCounts={perOptionCounts} />
-            )}
-          </StageCenter>
-        </Shell>
-      </TheaterBackground>
-    );
-  } else if (stage === "result") {
-    content = (
-      <TheaterBackground bgUrl={THEATRE_BG}>
-        {curtainsEnabled && <CurtainOverlay cycleKey={-1} topOffsetPx={0} edgePx={72} />}
-        <SpotlightOverlay
-          active={spotlightActive}
-          flicker={false}
-          holdOpacity={0.6}
-          center={[0.5, 0.5]}
-          duration={1.6}
-          exitDuration={0.8}
-        />
-        <Shell
-          title={
-            <code className="font-mono tracking-widest text-xl md:text-2xl">
-              {code || "—"}
-            </code>
-          }
-          headerRight={<StageBadge stage={stage} seconds={seconds} label="Next question in" />}
-          headerCenter={<Logo size="sm" onClick={() => window.location.reload()} />}
-        >
-          <StageCenter>
-            <LeaderboardBlock leaderboard={leaderboard} compact />
-            {typeof nextQuestion === "function" && (
-              <div className="mt-2">
-                <SecondaryButton onClick={nextQuestion}>Next now</SecondaryButton>
-              </div>
-            )}
-          </StageCenter>
-        </Shell>
-      </TheaterBackground>
-    );
-  } else if (stage === "gameover") {
-    content = (
-      <TheaterBackground bgUrl={THEATRE_BG}>
-        {curtainsEnabled && <CurtainOverlay cycleKey={-1} topOffsetPx={0} edgePx={72} />}
-        <SpotlightOverlay
-          active={spotlightActive}
-          flicker={false}
-          holdOpacity={0.6}
-          center={[0.5, 0.5]}
-          duration={1.6}
-          exitDuration={0.8}
-        />
-        <Shell
-          title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
-          headerRight={<StageBadge stage={stage} />}
-          headerCenter={<Logo size="sm" onClick={() => window.location.reload()} />}
-        >
-          <StageCenter>
-            <LeaderboardBlock leaderboard={leaderboard} />
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <SecondaryButton onClick={toLobby}>Back to lobby</SecondaryButton>
-            </div>
-          </StageCenter>
-        </Shell>
-      </TheaterBackground>
-    );
-  } else {
-    content = (
-      <TheaterBackground bgUrl={THEATRE_BG}>
-        {curtainsEnabled && <CurtainOverlay cycleKey={-1} topOffsetPx={0} edgePx={72} />}
-        <SpotlightOverlay
-          active={spotlightActive}
-          flicker={false}
-          holdOpacity={0.6}
-          center={[0.5, 0.5]}
-          duration={1.6}
-          exitDuration={0.8}
-        />
-        <Shell
-          title={<>{stage || "Hub"}</>}
-          headerRight={<StageBadge stage={stage} seconds={seconds} />}
-          headerCenter={<Logo size="sm" onClick={() => window.location.reload()} />}
+          title={<>{s || "Hub"}</>}
+          headerRight={<StageBadge stage={s} seconds={seconds} />}
+          headerCenter={<Link to="/"><Logo size="sm" /></Link>}
         >
           <StageCenter>
             <Card>Unknown stage.</Card>
@@ -415,11 +409,11 @@ function Hub() {
         </Shell>
       </TheaterBackground>
     );
-  }
+  };
 
   return (
     <div className="relative">
-      {content}
+      {renderMain(stage)}
       <EmoteStream />
     </div>
   );
@@ -475,10 +469,7 @@ function StageCenter({ children }) {
 
 function Landing({ onCreate }) {
   // Where to send players (localhost or deployed URL temporarily hardcoded here)
-  const playerUrl = "http://localhost:5174/"
-    /*(import.meta && import.meta.env && import.meta.env.VITE_PLAYER_URL) ||
-    `${window.location.origin.replace(/\/$/, "")}/player`;*/
-
+  const playerUrl = "http://localhost:5174/";
   const goToPlayer = () => window.open(playerUrl, "_self");
 
   const [copied, setCopied] = useState(false);
@@ -494,19 +485,12 @@ function Landing({ onCreate }) {
     <TheaterBackground bgUrl={THEATRE_BG}>
       <div className="relative z-10 min-h-dvh text-mist-100 px-4 sm:px-6 lg:px-8 py-10">
         <div className="mx-auto max-w-[900px] space-y-8">
-          {/* Header */}
-          <header className="flex items-center justify-between gap-4">
-            {/* keep empty or your header content */}
-          </header>
+          <header className="flex items-center justify-between gap-4"></header>
 
-        
-
-          {/* Logo above Join */}
           <section className="w-full text-center">
             <Logo size="lg" />
           </section>
 
-          {/* Join first */}
           <section className="w-full max-w-sm mx-auto grid gap-2">
             <SecondaryButton
               onClick={goToPlayer}
@@ -517,7 +501,6 @@ function Landing({ onCreate }) {
             </SecondaryButton>
           </section>
 
-          {/* Then create */}
           <section className="w-full max-w-sm mx-auto">
             <div className="text-xs uppercase tracking-wide text-mist-400 mt-8 mb-2">
               Or host a new game
@@ -530,11 +513,11 @@ function Landing({ onCreate }) {
               Create room
             </PrimaryButton>
           </section>
-            {/* Description */}
+
           <section className="grid gap-2 w-full text-center mb-4 mx-auto max-w-md">
             <p className="text-mist-300 max-w-prose text-balance mx-auto">
-              Host a music quiz. Friends join from their phones or desktop via the player. 
-            <b> Spotify account and app required for host.</b>
+              Host a music quiz. Friends join from their phones or desktop via the player.
+              <b> Spotify account and app required for host.</b>
             </p>
           </section>
         </div>
@@ -609,8 +592,6 @@ function SecondaryButton({ children, className = "", ...props }) {
   );
 }
 
-
-
 /* ============ Question / Reveal / Leaderboard ============ */
 
 function QuestionBlock({ question, showOptionsDimmed = false }) {
@@ -646,8 +627,6 @@ function QuestionBlock({ question, showOptionsDimmed = false }) {
     </div>
   );
 }
-
-
 
 function RevealBlock({ question, perOptionCounts }) {
   const correct = question?.correctIndex;
@@ -702,7 +681,6 @@ function RevealBlock({ question, perOptionCounts }) {
   );
 }
 
-
 function FreeTextReveal({ question }) {
   const meta = question?.trackMeta || {};
   const title =
@@ -732,8 +710,6 @@ function FreeTextReveal({ question }) {
     </div>
   );
 }
-
-
 
 function LeaderboardBlock({ leaderboard, compact = false }) {
   const wrap = compact
@@ -792,6 +768,7 @@ function LeaderboardBlock({ leaderboard, compact = false }) {
     </Card>
   );
 }
+
 const LOGO_SRC = "/images/mixmatch-logo.png";
 
 function Logo({ size = "lg", onClick }) {
