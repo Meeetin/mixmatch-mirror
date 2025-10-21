@@ -1,19 +1,12 @@
-// engine/geminiClient.js
-// Google Gen AI SDK client: simple, robust, JSON-friendly.
-
 
 import { GoogleGenAI } from "@google/genai";
 
-// Read key at call-time so dotenv order doesn't matter
+// Read key at call-time so dotenv order doesnt matter
 function getApiKey() {
   return process.env.GEMINI_API_KEY
 }
 
-// Preferred/allowed models (first that works wins).
-// You can pin via GEMINI_MODEL. Examples:
-// - gemini-flash-lite-latest
-// - gemini-2.5-flash
-// - gemini-2.0-flash-lite
+// Preferred/allowed models 
 const PREFERRED_MODELS = [
   process.env.GEMINI_MODEL,
   "gemini-flash-lite-latest",
@@ -32,7 +25,7 @@ function extractFirstJsonObject(text) {
 
   try { return JSON.parse(t); } catch {}
 
-  let start = -1, depth = 0, inStr = false, esc = false;
+  let start = -1, depth = 0, inStr = false, esc = false; // mutation is confined and function remains pure
   for (let i = 0; i < t.length; i++) {
     const c = t[i];
     if (inStr) {
@@ -95,7 +88,7 @@ Output MUST be a single JSON object and nothing else, in this exact shape:
 
   const user = `Title: ${title}\nArtist: ${artist}`;
 
-  // Try preferred models in order; stop on first success
+  // Try preferred models in order stop on first success, mutation is confined to this scope
   let lastError = null;
   for (const model of PREFERRED_MODELS) {
     try {
@@ -105,8 +98,6 @@ Output MUST be a single JSON object and nothing else, in this exact shape:
           { role: "user", parts: [{ text: system }] },
           { role: "user", parts: [{ text: user }] },
         ],
-        // You can tweak temperature / max tokens if you like:
-        // config: { temperature: 0.8, maxOutputTokens: 256 }
       });
 
       const raw = resp.text || "";

@@ -1,9 +1,8 @@
-// engine/questionEngine.js
 import crypto from "node:crypto";
 import { createQuestionFromTrack } from "./geminiClient.js";
 
 function shuffleInPlace(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
+  for (let i = arr.length - 1; i > 0; i--) { //Pure function: mutation is confined and does not affect external state
     const j = (Math.random() * (i + 1)) | 0;
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
@@ -26,29 +25,26 @@ function finalizeOptionsFromNewShape({ correctAnswer, distractors }) {
       unique.push(o);
     }
   }
-  // If we lost items to dedupe, pad with safe fillers
+  // If items lost to dedupe, pad with safe fillers
   while (unique.length < 4) unique.push("I don't know");
   return unique.slice(0, 4);
 }
 
-/**
- * Create question payload for the game round
- * @param {{ id:string, title:string, artist:string, previewUrl?:string }} track
- */
+
+//Create question payload for the game round
 export function createTrackRecognitionQuestion(track) {
   return {
     id: crypto.randomUUID(),
     type: "track-recognition",
     prompt: "Name this track",
     media: track.previewUrl ? { audioUrl: track.previewUrl } : undefined,
-    // no options / correctIndex for this type
   };
 }
 
 export async function generateQuestion(track) {
   const r = await createQuestionFromTrack(track);
 
-  // If Gemini returned the old finished-shape, just validate and forward
+  // If Gemini returned the old finished-shape, validate and forward
   if (Array.isArray(r?.options) && Number.isInteger(r?.correctIndex)) {
     const options = r.options.map(sanitizeOption).slice(0, 4);
     if (options.length === 4) {
@@ -68,7 +64,7 @@ export async function generateQuestion(track) {
     }
   }
 
-  // New shape (preferred): { prompt, correctAnswer, distractors[3] }
+  // New shape (preferred)
   const options = finalizeOptionsFromNewShape(r);
   const answer = sanitizeOption(r.correctAnswer ?? "");
 

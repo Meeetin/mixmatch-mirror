@@ -854,7 +854,6 @@ function seedTracks(room) {
         };
 
         io.to(room.code).emit("emote:new", payload);
-        console.log("emote:send -> emote:new", { room: room.code, from: displayName, size: image.length });
         cb({ ok: true });
       } catch (err) {
         console.error("emote:send error", err);
