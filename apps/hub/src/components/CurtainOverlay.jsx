@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-/**
- * CurtainOverlay (no external deps)
- * - Two 50vw panels that slide in/out.
- * - Transparent SVG curtains for true overlay.
- *
+/*
+
  * Props:
  *  - cycleKey: number   (bump to trigger a cycle; ignored when staticOpen)
  *  - staticOpen: bool   (force open, no transitions/animation)
@@ -41,7 +38,6 @@ export default function CurtainOverlay({
       setPose("open");
       return;
     }
-    // run cycle when cycleKey changes (if not static)
     if (cycleKey < 0) {
       setPose("open");
       return;
@@ -52,7 +48,6 @@ export default function CurtainOverlay({
       setPose("open");
       timers.current.push(setTimeout(() => onCycleEnd?.(), openMs + 20));
     }, closeMs + pauseMs));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleKey, staticOpen]);
 
   const transition = staticOpen ? "none" : `transform ${pose === "closed" ? closeMs : openMs}ms ease-in-out`;
@@ -98,7 +93,6 @@ export default function CurtainOverlay({
   );
 }
 
-/** Large, transparent theater curtain SVG (no background) */
 function CurtainSVG({ side = "left" }) {
   const flip = side === "right";
   return (

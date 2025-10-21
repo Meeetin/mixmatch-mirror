@@ -23,7 +23,7 @@ export const makeGameStore = (serverUrl) => {
       leaderboard: [],
       media: null,             // { audioUrl } (hub-only)
       joinError: null,         // e.g., ROOM_LOCKED, NO_SUCH_ROOM
-      lstTracks: [],           // [{ id, title, artist }] Uppdatera för rätt parametrar
+      lstTracks: [],
 
       // -------- Simple Game Settings (from server) --------
       config: { maxQuestions: 10, defaultDurationMs: 20000, selectedPlaylistIDs: [] },
@@ -41,8 +41,7 @@ export const makeGameStore = (serverUrl) => {
         players,
         hostId,
         firstPlayerId: firstPlayerId ?? st.firstPlayerId,
-        config: { ...(st.config || init.config), ...(config || {}) }, // keep server as source of truth
-        // only set lobby when we were idle; otherwise keep gameplay stage
+        config: { ...(st.config || init.config), ...(config || {}) },
         stage: code ? (st.stage === "idle" ? "lobby" : st.stage) : "idle",
       }))
     );
@@ -51,7 +50,6 @@ export const makeGameStore = (serverUrl) => {
       set({ ...init, selfId: s.connected ? s.id : null })
     );
 
-    // when server sends "we're back in lobby"
     s.on("game:lobby", () => {
       set({
         stage: "lobby",
@@ -162,7 +160,6 @@ export const makeGameStore = (serverUrl) => {
           } else {
             set({
               joinError: null,
-              // Show lobby right away; room:update will hydrate players/host/firstPlayerId/config
               code: c,
               stage: "lobby",
             });

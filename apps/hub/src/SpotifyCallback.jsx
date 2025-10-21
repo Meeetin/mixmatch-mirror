@@ -6,8 +6,7 @@ import { useGameStore } from "./store";
 export default function SpotifyCallback() {
   const createRoom = useGameStore(s => s.createRoom);
   const navigate = useNavigate();
-  const ran = useRef(false); // avoid React 18 StrictMode double-run in dev
-
+  const ran = useRef(false); 
   useEffect(() => {
     if (ran.current) return;
     ran.current = true;

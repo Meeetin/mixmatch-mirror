@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import s from "../socket.js";
 
-// Float timing
+// timings and limits
 const DUR_MIN = 5500;
 const DUR_MAX = 9000;
 const MAX_ITEMS = 24;
@@ -58,7 +58,6 @@ export default function EmoteStream() {
         }
       `}</style>
 
-      {/* Highest possible overlay: fixed + huge z-index + no pointer events */}
       <div className="pointer-events-none fixed inset-0 z-[999999]">
         {items.map((it) => (
           <Emote key={it.id} item={it} />
@@ -76,7 +75,6 @@ function Emote({ item }) {
       style={{
         left: `${item.left}%`,
         bottom: `-8vh`,
-        // keep the rise animation; it sets transform itself
         animation: `emote-rise ${item.dur}ms linear forwards`,
       }}
     >

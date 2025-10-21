@@ -1,14 +1,12 @@
 // apps/hub/src/spotify/spotifyClient.js
 import {
   getAccessToken,
-  getPlaylistData,            // low-level: one page of tracks (needs uri in fields)
+  getPlaylistData,
   getPreferredDeviceId,
   setPreferredDeviceId,
 } from "./spotifyAuth.js";
 
-/* -------------------------------------------------------------------------- */
-/*                                HTTP helper                                 */
-/* -------------------------------------------------------------------------- */
+// ---- Spotify Web API wrapper ----
 async function api(path, init = {}) {
   const token = await getAccessToken();
   if (!token) throw new Error("No Spotify token");
@@ -44,9 +42,7 @@ async function api(path, init = {}) {
   throw e;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                           Devices (Spotify Connect)                         */
-/* -------------------------------------------------------------------------- */
+
 export async function listDevices() {
   const data = await api("/me/player/devices");
   return data?.devices || [];
@@ -62,10 +58,9 @@ function pickBestDevice(devices) {
   );
 }
 
-/** Returns a usable device id, preferring stored choice or desktop app. */
 async function ensureDeviceId(candidate = null) {
-  let id = candidate || getPreferredDeviceId();
-  if (id) return id;
+  const existing = candidate || getPreferredDeviceId();
+  if (existing) return existing;
 
   const devices = await listDevices();
   const best = pickBestDevice(devices);
@@ -77,9 +72,7 @@ async function ensureDeviceId(candidate = null) {
   return best.id;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                   Playlists -> normalized minimal tracks                    */
-/* -------------------------------------------------------------------------- */
+
 /** Accept plain id, spotify:playlist:URI, or open.spotify.com URL. */
 function normPlaylistId(input) {
   const s = String(input || "").trim();
@@ -95,24 +88,25 @@ function normalizeTrack(t) {
     id: t.id,
     title: t.name || "",
     artist: artists.join(", "),
-    uri: t.uri || null,          // required for Spotify Connect playback
-    previewUrl: t.preview_url || null, // kept for completeness, not used here
+    uri: t.uri || null,
+    previewUrl: t.preview_url || null,
   };
 }
 
-/** One playlist, one page (up to 100 items) — via spotifyAuth.getPlaylistData */
 export async function getPlaylistTracksLow(playlistId, { limit = 100 } = {}) {
   const token = await getAccessToken();
   if (!token) throw new Error("No Spotify token");
   const id = normPlaylistId(playlistId);
-  const raw = await getPlaylistData(token, id);   // should return raw track objects
+  const raw = await getPlaylistData(token, id);
   const out = raw.map(normalizeTrack).filter(Boolean);
   return out.slice(0, limit);
 }
 
-/** Multiple playlists (concat first page from each, optional shuffle, clamp). */
-export async function collectTracksFromPlaylists(
-  playlistIds,
+export async function collectTracksFromPlaylists(   
+// We use let only inside the Fisher–Yates shuffle to keep it O(n) time.
+// These let indices are local to the loop and never mutate shared application state.
+
+  playlistIds, 
   { perList = 100, maxTotal = 200, shuffle = true } = {}
 ) {
   const ids = Array.from(new Set((playlistIds || []).map(normPlaylistId)));
@@ -129,7 +123,6 @@ export async function collectTracksFromPlaylists(
   const seen = new Set();
   const dedup = bag.filter(t => (t.id && !seen.has(t.id)) ? (seen.add(t.id), true) : false);
 
-  // optional shuffle
   if (shuffle) {
     for (let i = dedup.length - 1; i > 0; i--) {
       const j = (Math.random() * (i + 1)) | 0;
@@ -139,16 +132,12 @@ export async function collectTracksFromPlaylists(
   return dedup.slice(0, maxTotal);
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                 Playback                                   */
-/* -------------------------------------------------------------------------- */
 export async function getPlaybackState() {
   try {
     // returns { is_playing, item, device, ... } or null
     const st = await api("/me/player");
     return st || null;
   } catch {
-    // 204 No Content is normal if nothing is active
     return null;
   }
 }
@@ -157,11 +146,9 @@ export async function startPlayback({ uris, position_ms = 0, device_id = null })
     throw new Error("startPlayback: uris[] required");
   }
 
-  // 1) Pick a device (prefer desktop), remember it
   const id = await ensureDeviceId(device_id);
   const q = `?device_id=${encodeURIComponent(id)}`;
 
-  // 2) Direct play on that device
   try {
     await api(`/me/player/play${q}`, {
       method: "PUT",
@@ -169,7 +156,6 @@ export async function startPlayback({ uris, position_ms = 0, device_id = null })
     });
     return;
   } catch (e) {
-    // 3) If play failed (e.g., session attached elsewhere), transfer then retry
     try {
       await api("/me/player", {
         method: "PUT",
@@ -181,27 +167,23 @@ export async function startPlayback({ uris, position_ms = 0, device_id = null })
       });
       return;
     } catch (e2) {
-      // Surface the original error info but we tried transfer
       console.error("startPlayback failed after transfer attempt", e, e2);
       throw e2;
     }
   }
 }
 
-// Fire-and-forget pause: never parse JSON, never throw
 export async function pausePlayback() {
   try {
     const st = await getPlaybackState().catch(() => null);
-    if (!st?.is_playing) return; // nothing to pause → skip the call
-    await api(`/me/player/pause`, { method: "PUT" }); // no device_id to avoid extra 403s
+    if (!st?.is_playing) return;
+    await api(`/me/player/pause`, { method: "PUT" });
   } catch (e) {
-    // ignore benign errors
     if (e?.status !== 403 && e?.status !== 404) console.warn("pausePlayback", e);
   }
 }
 
 
-/** Optional helper if you add a device picker UI later. */
 export async function transferPlaybackTo(device_id, { play = false } = {}) {
   if (!device_id) throw new Error("transferPlaybackTo: device_id required");
   setPreferredDeviceId(device_id);
@@ -211,25 +193,7 @@ export async function transferPlaybackTo(device_id, { play = false } = {}) {
   });
 }
 
-/* -------------------------------------------------------------------------- */
-/*                       Quiz-driven playback controller                      */
-/* -------------------------------------------------------------------------- */
-/**
- * Connect-only controller. Autostarts when:
- *  - stage enters "question" AND media.spotifyUri already present, OR
- *  - media.spotifyUri arrives later during the same question (race fix)
- * Stops on leaving "question" (reveal/result/gameover).
- *
- * Usage in App.jsx:
- *   useEffect(() => {
- *     const unsub = attachPlaybackController(useGame); // no getAudioEl: no browser audio
- *     return unsub;
- *   }, []);
- */
-// Replace your current attachPlaybackController with THIS version
-// ... keep existing imports and helpers ...
 
-// --- Replace existing attachPlaybackController with this version ---
 export function attachPlaybackController(useGame) {
   const select = (s) => ({
     stage: s.stage,
@@ -238,47 +202,44 @@ export function attachPlaybackController(useGame) {
   });
   const same = (a, b) => a.stage === b.stage && a.qid === b.qid && a.uri === b.uri;
 
-  let last = select(useGame.getState());
-  let lastQ = null;
-  let playedThisQ = false;
-  let keepAlive = null;
+  const ref = {
+    last: select(useGame.getState()),
+    lastQ: null,
+    playedThisQ: false,
+    keepAlive: null,
+  };
 
   // Only resume if it's the SAME track and currently paused.
   async function resumeIfPausedSameTrack(targetUri) {
     try {
       const st = await getPlaybackState().catch(() => null);
       const sameTrack = !!(st?.item?.uri && targetUri && st.item.uri === targetUri);
-      if (!sameTrack) return;              // never start a different track here
-      if (st?.is_playing) return;          // already playing → nothing to do
-
-      // Empty body resumes current context; no device_id to avoid 403 churn.
+      if (!sameTrack) return;     // never start a different track here
+      if (st?.is_playing) return; // already playing → nothing to do
       await api(`/me/player/play`, { method: "PUT", body: JSON.stringify({}) });
     } catch {
-      // swallow – keepalive should never hard-reset the song
+      // keepAlive shouldn't hard-reset anything even if this fails
     }
   }
 
   async function onEnterQuestion(uri) {
-    // Reset guards for the new question
-    playedThisQ = false;
+    ref.playedThisQ = false;
 
-    // Stop any previous keepalive
-    if (keepAlive) { clearInterval(keepAlive); keepAlive = null; }
+    if (ref.keepAlive) { clearInterval(ref.keepAlive); ref.keepAlive = null; }
 
-    // IMPORTANT: don't pause here; it can create the start/pause flicker.
     if (uri) {
       try {
         await startPlayback({ uris: [uri], position_ms: 0 });
-        playedThisQ = true;
+        ref.playedThisQ = true;
       } catch (e) {
         console.warn("[ctrl] initial play failed", e);
       }
     }
 
-    // Gentle keepalive: only resume if same track is paused; never restart.
-    keepAlive = setInterval(() => {
+    ref.keepAlive = setInterval(() => {
       const st = select(useGame.getState());
-      if (st.stage === "question" && st.qid === lastQ && st.uri) {
+      if (st.stage === "question" && st.qid === ref.lastQ && st.uri) {
+        // resume only if paused on the SAME uri
         resumeIfPausedSameTrack(st.uri);
       }
     }, 800);
@@ -286,47 +247,44 @@ export function attachPlaybackController(useGame) {
 
   async function react(curr, prev) {
     const { stage, qid, uri } = curr;
-    const entering = stage === "question" && qid && qid !== lastQ;
+    const entering = stage === "question" && qid && qid !== ref.lastQ;
     const leavingQuestion = prev.stage === "question" && stage !== "question";
 
     if (entering) {
-      lastQ = qid;
+      ref.lastQ = qid;
       await onEnterQuestion(uri);
       return;
     }
 
     if (leavingQuestion) {
-      if (keepAlive) { clearInterval(keepAlive); keepAlive = null; }
-      // do NOT pause; let reveal/result continue audio if you want
+      if (ref.keepAlive) { clearInterval(ref.keepAlive); ref.keepAlive = null; }
       return;
     }
 
-    // URI arrived later during the SAME question (race fix)
     const uriArrived =
-      stage === "question" && qid === lastQ && !playedThisQ && !!uri && prev.uri !== uri;
+      stage === "question" && qid === ref.lastQ && !ref.playedThisQ && !!uri && prev.uri !== uri;
 
     if (uriArrived) {
       try {
         await startPlayback({ uris: [uri], position_ms: 0 });
-        playedThisQ = true;
+        ref.playedThisQ = true;
       } catch (e) {
         console.warn("[ctrl] late media play failed", e);
       }
     }
 
     if (stage === "gameover") {
-      if (keepAlive) { clearInterval(keepAlive); keepAlive = null; }
+      if (ref.keepAlive) { clearInterval(ref.keepAlive); ref.keepAlive = null; }
       try { await pausePlayback(); } catch {}
     }
   }
 
-  // Run once immediately (handles refresh mid-question)
-  react(last, last);
+  react(ref.last, ref.last);
 
   const unsub = useGame.subscribe(() => {
     const curr = select(useGame.getState());
-    if (same(curr, last)) return;
-    const prev = last; last = curr;
+    if (same(curr, ref.last)) return;
+    const prev = ref.last; ref.last = curr;
     react(curr, prev);
   });
 
@@ -334,12 +292,15 @@ export function attachPlaybackController(useGame) {
     try { window.__mm_playback_unsub?.(); } catch {}
     window.__mm_playback_unsub = unsub;
   }
+
+  // cleanup
   return () => {
     try { unsub(); } catch {}
-    if (keepAlive) { clearInterval(keepAlive); keepAlive = null; }
+    if (ref.keepAlive) { clearInterval(ref.keepAlive); ref.keepAlive = null; }
     if (typeof window !== "undefined" && window.__mm_playback_unsub === unsub) {
       window.__mm_playback_unsub = null;
     }
   };
 }
+
 

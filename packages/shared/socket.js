@@ -1,10 +1,8 @@
-// packages/shared/socket.js
 import { io } from "socket.io-client";
 
 let s;
 
 export function getSocket(url) {
-  // Reuse across duplicate bundles
   if (typeof window !== "undefined" && window.__MIXMATCH_SOCKET__) {
     s = window.__MIXMATCH_SOCKET__;
     return s;
@@ -20,7 +18,7 @@ export function getSocket(url) {
     autoConnect: true,
   };
 
-  s = url ? io(url, opts) : io(opts); // <-- no hardcoded localhost
+  s = url ? io(url, opts) : io(opts);
 
   if (typeof window !== "undefined") {
     window.__MIXMATCH_SOCKET__ = s;

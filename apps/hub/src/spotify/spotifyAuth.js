@@ -29,7 +29,7 @@ export async function redirectToAuth() {
 
     localStorage.setItem('code_verifier', codeVerifier);
     localStorage.setItem('spotify_auth_state', state);
-    console.log('AUTH start', { origin: window.location.origin, state, codeVerifier }); // for testing
+    
 
     const hashed = await sha256(codeVerifier)
     const codeChallenge = base64encode(hashed);
@@ -45,7 +45,7 @@ export async function redirectToAuth() {
       ].join(" ");
     const authUrl = new URL("https://accounts.spotify.com/authorize")
     const spotifyID = ID;
-    console.log(spotifyID);
+    //console.log(spotifyID);
 
     const params =  {
         response_type: 'code',
@@ -62,24 +62,20 @@ export async function redirectToAuth() {
 }
 
 
-// Exchange ?code -> tokens
 export async function requestToken() {
     const url = new URL(window.location.href);
-    // Temp for testing
     console.log('AUTH return', {
         origin: window.location.origin,
         returnedState: url.searchParams.get('state'),
         storedState: localStorage.getItem('spotify_auth_state')
     });
 
-    // If Spotify sent back an error:
     const err = url.searchParams.get("error");
     if (err) throw new Error("Spotify auth error: " + err);
   
     const code = url.searchParams.get("code");
-    if (!code) return null; // nothing to do (user hasn't just returned)
+    if (!code) return null;
   
-    // Optional CSRF check:
     const returnedState = url.searchParams.get("state");
     const storedState   = localStorage.getItem("spotify_auth_state");
     if (!returnedState || returnedState !== storedState) {
@@ -118,10 +114,8 @@ export async function requestToken() {
     localStorage.removeItem("code_verifier");
     localStorage.removeItem("spotify_auth_state");
   
-    // Remove ?code&state from the address bar
-    // window.history.replaceState({}, document.title, url.pathname);
-  
-    return data; // or return data.access_token if you prefer
+ 
+    return data;
 }
   
 // Handy helpers
@@ -131,13 +125,9 @@ export function hasSpotifyToken() {
     return !!t && Date.now() < ea;
 }
 
-/*
-export async function getAccessToken() {
-    // (Optional: add refresh flow here later if token expired)
-    return hasSpotifyToken() ? localStorage.getItem("access_token") : null;
-}*/
 
-const EXPIRY_SKEW_MS = 5000; // buffer to avoid edge-of-expiry
+
+const EXPIRY_SKEW_MS = 5000;
 
 export async function getAccessToken() {
   const token = localStorage.getItem("access_token");
@@ -148,9 +138,8 @@ export async function getAccessToken() {
     return token;
   }
 
-  // Try to refresh if we can.
   const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken) return null; // no way to refresh → caller should trigger login
+  if (!refreshToken) return null; 
 
   const body = new URLSearchParams({
     client_id: ID,
@@ -167,10 +156,10 @@ export async function getAccessToken() {
   const { data, raw } = await readJsonOrText(resp);
   if (!resp.ok) {
     console.error("Spotify refresh failed:", data?.error_description || data?.error?.message || raw);
-    return null; // optional: clear tokens here if you want a clean slate
+    return null;
   }
 
-  // 3) Persist new token (+ optional rotated refresh token) and return it.
+  
   localStorage.setItem("access_token", data.access_token);
   const expiresAt = Date.now() + (Number(data.expires_in || 3600) - 60) * 1000;
   localStorage.setItem("expires_at", String(expiresAt));
@@ -181,7 +170,7 @@ export async function getAccessToken() {
 
 async function readJsonOrText(resp) {
     const contentType = resp.headers.get("content-type") || "";
-    const raw = await resp.text();         // read the body ONCE
+    const raw = await resp.text();
   
     let data = null;
     if (contentType.includes("application/json")) {
@@ -191,18 +180,14 @@ async function readJsonOrText(resp) {
   }
 
 export async function getPlaylistData(accessToken, playlistID) {
-    // url for get playlist API call
     const url = new URL(`https://api.spotify.com/v1/playlists/${playlistID}/tracks`);
-    // "fields" filters to only give wanted playlist info
     url.searchParams.set(
         "fields", 
         "items(track(id,uri,preview_url,name,artists(name),album(name,images)))"
-    ); // only return tracks.items
-    // fetch with access token
+    );
     const resp = await fetch(url, {
         headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
     });
-    // const data = await resp.json();
     const { data, raw } = await readJsonOrText(resp);
     if (!resp.ok) {
         const msg =
@@ -216,10 +201,9 @@ export async function getPlaylistData(accessToken, playlistID) {
     return data.items.map(i => i.track);
 }
 
-// ---- Device preference (added so your spotifyClient.js import stops erroring) ----
+// ---- Device preference ----
 const PREFERRED_DEVICE_KEY = "spotify_preferred_device_id";
 
-/* Returns the last chosen deviceId (or null if unset). */
 export function getPreferredDeviceId() {
   try {
     return localStorage.getItem(PREFERRED_DEVICE_KEY) || null;
@@ -228,7 +212,6 @@ export function getPreferredDeviceId() {
   }
 }
 
-/* Persist a preferred deviceId (pass null/undefined to clear). */
 export function setPreferredDeviceId(deviceId) {
   try {
     if (!deviceId) {

@@ -1,4 +1,3 @@
-// apps/hub/src/components/GameHistory.jsx
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
@@ -39,8 +38,7 @@ export default function GameHistory() {
       ? new Date(r.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
       : "—";
 
-    // Best-effort genre extraction with sensible fallbacks
-    const genre = "-"
+    const genre = "-" //add genre lookup later
      
 
     return {
@@ -63,15 +61,13 @@ export default function GameHistory() {
   );
 }
 
-/* ------------------------- seamless looping row ------------------------- */
 
 function LoopingRow({ items }) {
   const viewportRef = useRef(null);
   const contentRef = useRef(null);
   const [contentWidth, setContentWidth] = useState(0);
 
-  // Only the inner row moves; the container stays static.
-  const SPEED = 10; // px/s (slow + smooth)
+  const SPEED = 10; // px/s 
   const duration = contentWidth > 0 ? contentWidth / SPEED : 10;
 
   useEffect(() => {
@@ -110,13 +106,13 @@ function LoopingRow({ items }) {
           animate={{ x: contentWidth ? [0, -contentWidth] : [0, 0] }}
           transition={{ duration, ease: "linear", repeat: Infinity }}
         >
-          {/* RUN A (measured) */}
+          
           <div ref={contentRef} className="flex gap-3 sm:gap-4">
             {items.map((it) => (
               <HistoryCard key={`A-${it.key}`} item={it} />
             ))}
           </div>
-          {/* RUN B (clone) */}
+          
           <div className="flex gap-3 sm:gap-4" aria-hidden="true">
             {items.map((it) => (
               <HistoryCard key={`B-${it.key}`} item={it} />
@@ -137,7 +133,6 @@ function HistoryCard({ item }) {
                  px-3 sm:px-4 py-2 sm:py-2.5 text-white/90 shadow-sm backdrop-blur-0
                  min-w-[240px] max-w-[300px]"
     >
-      {/* Top row: Date (left) — Genre (right) */}
       <div className="flex items-center justify-between">
         <span className="text-[11px] uppercase tracking-wide text-white/60">{item.date}</span>
         <span
@@ -148,7 +143,6 @@ function HistoryCard({ item }) {
         </span>
       </div>
 
-      {/* Player name (2-line clamp, tooltip for full) */}
       <div
         className="mt-1 text-sm sm:text-base font-semibold leading-tight break-words"
         style={{
@@ -162,7 +156,6 @@ function HistoryCard({ item }) {
         {item.player}
       </div>
 
-      {/* Labeled stats */}
       <div className="mt-2 flex items-center gap-2">
         <Stat label="Points" value={item.points} />
         <Stat label="Questions" value={item.questions} />
