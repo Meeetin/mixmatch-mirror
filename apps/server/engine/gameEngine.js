@@ -8,7 +8,6 @@ export function registerGameEngine(io, mediaDir) {
   const rooms = new Map();
 
   /** ------------------ Track source (hardcoded fallback) ------------------ */
-  // Provide at least { id, title, artist, previewUrl?, uri? }.
   const HARDCODED_TRACKS = [
     { id: "t1",  title: "Billie Jean",                 artist: "Michael Jackson" },
     { id: "t2",  title: "Smells Like Teen Spirit",     artist: "Nirvana" },
@@ -30,7 +29,7 @@ export function registerGameEngine(io, mediaDir) {
     const lower = base.toLowerCase();
     const existing = new Set(Array.from(room.players.values()).map(p => p.name.toLowerCase()));
     if (!existing.has(lower)) return base;
-    let i = 2;
+    let i = 2; //Pure function: mutation is confined and does not affect external state
     while (existing.has(`${lower} (${i})`)) i++;
     return `${base} (${i})`;
   }
@@ -65,38 +64,98 @@ export function registerGameEngine(io, mediaDir) {
   }
   function progressCounts(room) {
     const connected = new Set(Array.from(room.players.values()).map(p => p.name.toLowerCase()));
-    let answered = 0;
+    let answered = 0; //Pure function: mutation is confined and does not affect external state
     for (const key of room.answersByName.keys()) {
       if (connected.has(key)) answered++;
     }
     return { answered, total: room.players.size };
   }
   function shuffle(a) {
-    for (let i = a.length - 1; i > 0; i--) {
+    for (let i = a.length - 1; i > 0; i--) { //Pure function: mutation is confined and does not affect external state
       const j = (Math.random() * (i + 1)) | 0;
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
   }
-
   function ensureTracksSeeded(room) {
   if (!room.tracks || room.tracks.length === 0) {
     seedTracks(room);
-    room.tracksSeeded = true; // optional flag if you want to know it happened
+    room.tracksSeeded = true;
     }
   }
 
   function coinFlip() { return Math.random() < 0.5; }
 
-  function normalizeText(s) {
-    return String(s || "")
+  function stripDiacritics(s) {
+    try { return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+    catch { return String(s || ""); }
+  }
+
+  // Normalization for titles.
+  function normalizeTitle(s) {
+    return stripDiacritics(s)
       .toLowerCase()
-      // remove content in parentheses/brackets like "(Remastered)" for leniency
       .replace(/\([^)]*\)/g, "")
       .replace(/\[[^\]]*\]/g, "")
+      .replace(/\b(feat|featuring|ft)\.?\s+[a-z0-9\s]+$/i, "")
+      .replace(/\b(remaster(?:ed)?|version|edit|mix|radio|mono|stereo)\b/g, "")
       .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
       .trim();
   }
+
+  // Levenshtein distance, 
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+
+    let prev = new Array(n + 1); //Pure function: no external state is read/modified, arguments are never mutated
+    for (let j = 0; j <= n; j++) prev[j] = j;
+
+    for (let i = 1; i <= m; i++) {
+      const ai = a.charCodeAt(i - 1);
+      const curr = new Array(n + 1);
+      curr[0] = i;
+      for (let j = 1; j <= n; j++) {
+        const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
+        curr[j] = Math.min(
+          prev[j] + 1,      // deletion
+          curr[j - 1] + 1,  // insertion
+          prev[j - 1] + cost // substitution
+        );
+      }
+      prev = curr;
+    }
+    return prev[n];
+  }
+
+// Decide if guess is "close enough"
+function isCloseEnough(guessRaw, targetRaw) {
+  const guess = normalizeTitle(guessRaw);
+  const target = normalizeTitle(targetRaw);
+  if (!guess || !target) return false;
+  if (guess === target) return true;
+
+  // 1) Edit-distance threshold: allow ~20% typos
+  const d = levenshtein(guess, target);
+  const maxLen = Math.max(guess.length, target.length);
+  const allowed = Math.max(1, Math.floor(maxLen * 0.2));
+  if (d <= allowed) return true;
+
+  // 2) Token overlap (Jaccard) as backup: accept if >= 0.6
+  const gs = new Set(guess.split(" ").filter(Boolean));
+  const ts = new Set(target.split(" ").filter(Boolean));
+  let inter = 0; for (const t of gs) if (ts.has(t)) inter++; //mutation is confined
+  const union = gs.size + ts.size - inter;
+  const jacc = union ? inter / union : 0;
+  return jacc >= 0.6;
+}
+
+
+
+
+
 
   /** ------------------ round engine ------------------ */
   async function startQuestion(room) {
@@ -107,21 +166,16 @@ export function registerGameEngine(io, mediaDir) {
 
     const track = room.tracks[room.trackIdx];
 
-    let q;
+    const q = await (async () => {
     try {
-        const playable = track.previewUrl || track.uri;
-        const useTrackRecognition = playable ? coinFlip() : false;
-        if (useTrackRecognition) {
-          // build the free-text question that plays the current track
-          q = createTrackRecognitionQuestion(track);
-        } else {
-          //multiple-choice question (Gemini)
-          q = await generateQuestion(track);
-        }
-      } catch (err) {
+      const playable = track.previewUrl || track.uri;
+      const useTrackRecognition = playable ? coinFlip() : false;
+      return useTrackRecognition
+        ? createTrackRecognitionQuestion(track)
+        : await generateQuestion(track);
+    } catch (err) {
       console.error("Question generation failed; using fallback:", err);
-      // Fallback: simple artist question
-      q = {
+      return {
         id: crypto.randomUUID(),
         type: "multiple-choice",
         prompt: `Who is the artist of "${track.title}"?`,
@@ -130,6 +184,7 @@ export function registerGameEngine(io, mediaDir) {
         media: track.previewUrl ? { audioUrl: track.previewUrl } : undefined,
       };
     }
+  })();
 
     room.trackIdx += 1;
 
@@ -207,7 +262,6 @@ export function registerGameEngine(io, mediaDir) {
       // track-recognition: store free-text
       const value = typeof text === "string" ? text : String(answerIndex ?? "").trim();
       room.answersByName.set(key, value);
-      // no perOptionCounts for this type
     }
 
     const { answered, total } = progressCounts(room);
@@ -293,7 +347,7 @@ export function registerGameEngine(io, mediaDir) {
       totalRounds: room.config.maxQuestions,
     });
 
-    // 🧠 Save game to MongoDB
+    // Save game to MongoDB
     await handleGameEnd(room);
    }
 
@@ -378,28 +432,17 @@ export function registerGameEngine(io, mediaDir) {
     io.to(room.code).emit("game:lobby");
   }
 
-  /**
-   * Seed the room's tracks from the host-provided Spotify list (if any),
-   * otherwise fall back to the hardcoded demo list.
-   */
-  function isPlayable(t) {
-  return !!(t && (t.uri || t.previewUrl));
-}
-
 function seedTracks(room) {
-  // only use demo tracks if explicitly allowed
-  let source = [];
-  if (Array.isArray(room.spotifyTracks) && room.spotifyTracks.length) {
-    source = room.spotifyTracks;
-  } else if (Array.isArray(room.lstTracks) && room.lstTracks.length) {
-    source = room.lstTracks;
-  } else if (room.allowDemo) {
-    source = HARDCODED_TRACKS;
-  } else {
-    source = []; // <- no implicit fallback
-  }
+  const source =
+  Array.isArray(room.spotifyTracks) && room.spotifyTracks.length
+    ? room.spotifyTracks
+    : Array.isArray(room.lstTracks) && room.lstTracks.length
+      ? room.lstTracks
+      : room.allowDemo
+        ? HARDCODED_TRACKS
+        : [];
 
-  const base = source.slice(); // clone
+  const base = source.slice(); 
   const list = room.config.randomizeOnStart ? shuffle(base) : base;
 
   room.tracks = list;
@@ -470,7 +513,7 @@ function seedTracks(room) {
       }
     });
 
-    /** Player joins a room (strict: only whitelisted names can rejoin after start) */
+    /** Player joins a room - only whitelisted names can rejoin after start */
     socket.on("player:joinRoom", ({ code, name }, cb) => {
       try {
         const room = rooms.get((code || "").toUpperCase());
@@ -484,34 +527,30 @@ function seedTracks(room) {
           Array.from(room.players.values()).map(p => p.name.toLowerCase())
         );
 
-        let finalName = desired;
-        let startScore = 0;
-        let isReclaim = false;
 
-        if (joiningDuringGame) {
-          if (!room.whitelistNames?.has(key)) {
-            return cb?.({ ok: false, error: "ROOM_LOCKED" });
+        const decision = (() => {
+          if (joiningDuringGame) {
+            if (!room.whitelistNames?.has(key)) {
+              return { error: "ROOM_LOCKED" };
+            }
+            if (room.reclaimByName.has(key) && !connectedNames.has(key)) {
+              const saved = room.reclaimByName.get(key);
+              return { finalName: saved.name, startScore: saved.score || 0, isReclaim: true, deleteKey: key };
+            }
+            return { error: "ROOM_LOCKED" };
           }
+          // lobby
           if (room.reclaimByName.has(key) && !connectedNames.has(key)) {
             const saved = room.reclaimByName.get(key);
-            finalName = saved.name;
-            startScore = saved.score || 0;
-            isReclaim = true;
-            room.reclaimByName.delete(key);
-          } else {
-            return cb?.({ ok: false, error: "ROOM_LOCKED" });
+            return { finalName: saved.name, startScore: saved.score || 0, isReclaim: true, deleteKey: key };
           }
-        } else {
-          if (room.reclaimByName.has(key) && !connectedNames.has(key)) {
-            const saved = room.reclaimByName.get(key);
-            finalName = saved.name;
-            startScore = saved.score || 0;
-            isReclaim = true;
-            room.reclaimByName.delete(key);
-          } else {
-            finalName = uniqueName(room, desired);
-          }
-        }
+          return { finalName: uniqueName(room, desired), startScore: 0, isReclaim: false };
+        })();
+
+        if (decision.error) return cb?.({ ok: false, error: decision.error });
+        if (decision.deleteKey) room.reclaimByName.delete(decision.deleteKey);
+        const { finalName, startScore, isReclaim } = decision;
+
 
         socket.join(room.code);
         socket.data.role = "player";
@@ -586,7 +625,7 @@ function seedTracks(room) {
         room.lstTracks = lstTracks;
 
         //reset counters
-        // re-seed and reset counters (seedTracks will prefer spotifyTracks if present)
+        // re-seed and reset counters
         seedTracks(room);
         room.qCount = 0;
 
@@ -693,11 +732,11 @@ function seedTracks(room) {
       if (dedup.length) {
         room.spotifyTracks = dedup;
       }
-      // (no else — if empty/invalid we fall back to last known tracks)
+      
     }
 
     room.qCount = 0; // reset round counter
-    playAgain(room); // this calls seedTracks(room) and immediately startQuestion(room)
+    playAgain(room); 
     cb?.({ ok: true });
   } catch (err) {
     console.error("game:playAgain error", err);
@@ -720,11 +759,7 @@ function seedTracks(room) {
       }
     });
 
-    /**
-     * Simple Game Settings (host-only, lobby-only)
-     * Loosened maxQuestions upper bound (now up to 100);
-     * seedTracks() will clamp to the number of available tracks at start.
-     */
+
     socket.on("game:updateConfig", (payload, cb) => {
       try {
         const code = payload?.code || socket.data?.code;
@@ -736,7 +771,6 @@ function seedTracks(room) {
         const clamp = (n, lo, hi, fallback) =>
           Number.isFinite(Number(n)) ? Math.max(lo, Math.min(hi, Number(n))) : fallback;
 
-        // previously limited by HARDCODED_TRACKS.length (10). Allow up to 100.
         const maxQuestions = clamp(payload?.maxQuestions, 1, 100, room.config.maxQuestions);
         const defaultDurationMs = clamp(payload?.durationMs, 5000, 120000, room.config.defaultDurationMs);
         const randomizeOnStart = Boolean(payload?.randomizeOnStart ?? room.config.randomizeOnStart);
@@ -773,7 +807,7 @@ function seedTracks(room) {
     }
     });
 
-    /** ------------------ EMOTES (kept from your old index.js) ------------------ */
+    /** ------------------ EMOTES ------------------ */
     socket.on("emote:send", ({ code, image }, cb = () => {}) => {
       try {
         const room = rooms.get((code || socket.data.code || "").toUpperCase());
@@ -840,7 +874,7 @@ function seedTracks(room) {
         // Host left: close the room
         stopAllAndClose(room);
       } else {
-        // Save for reclaim (only matters after start; harmless in lobby)
+        // Save for reclaim
         const leaving = room.players.get(socket.id);
         if (leaving) {
           room.reclaimByName.set(
@@ -869,74 +903,4 @@ function seedTracks(room) {
     });
   });
 }
-/** ------------------ Title normalization & matching ------------------ */
-// Remove accents (Beyoncé -> beyonce), then lower-case and simplify.
-function stripDiacritics(s) {
-  try { return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
-  catch { return String(s || ""); }
-}
 
-// More aggressive normalization for titles.
-function normalizeTitle(s) {
-  return stripDiacritics(s)
-    .toLowerCase()
-    // remove (...) and [...] content: (Remastered), [Live], etc.
-    .replace(/\([^)]*\)/g, "")
-    .replace(/\[[^\]]*\]/g, "")
-    // drop trailing "feat/featuring/ft ..." blobs
-    .replace(/\b(feat|featuring|ft)\.?\s+[a-z0-9\s]+$/i, "")
-    // drop common version words that cause false negatives
-    .replace(/\b(remaster(?:ed)?|version|edit|mix|radio|mono|stereo)\b/g, "")
-    // collapse to single spaces
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// Classic Levenshtein distance (O(m*n), but strings are short here)
-function levenshtein(a, b) {
-  const m = a.length, n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-
-  let prev = new Array(n + 1);
-  for (let j = 0; j <= n; j++) prev[j] = j;
-
-  for (let i = 1; i <= m; i++) {
-    const ai = a.charCodeAt(i - 1);
-    const curr = new Array(n + 1);
-    curr[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
-      curr[j] = Math.min(
-        prev[j] + 1,      // deletion
-        curr[j - 1] + 1,  // insertion
-        prev[j - 1] + cost // substitution
-      );
-    }
-    prev = curr;
-  }
-  return prev[n];
-}
-
-// Decide if guess is "close enough" to target.
-function isCloseEnough(guessRaw, targetRaw) {
-  const guess = normalizeTitle(guessRaw);
-  const target = normalizeTitle(targetRaw);
-  if (!guess || !target) return false;
-  if (guess === target) return true;
-
-  // 1) Edit-distance threshold: allow ~20% typos
-  const d = levenshtein(guess, target);
-  const maxLen = Math.max(guess.length, target.length);
-  const allowed = Math.max(1, Math.floor(maxLen * 0.2)); // tweakable
-  if (d <= allowed) return true;
-
-  // 2) Token overlap (Jaccard) as backup: accept if >= 0.6
-  const gs = new Set(guess.split(" ").filter(Boolean));
-  const ts = new Set(target.split(" ").filter(Boolean));
-  let inter = 0; for (const t of gs) if (ts.has(t)) inter++;
-  const union = gs.size + ts.size - inter;
-  const jacc = union ? inter / union : 0;
-  return jacc >= 0.6;
-}
