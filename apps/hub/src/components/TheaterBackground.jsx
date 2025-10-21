@@ -1,8 +1,5 @@
-// apps/hub/src/components/TheaterBackground.jsx
-// apps/hub/src/components/TheaterBackground.jsx
 export default function TheaterBackground({ bgUrl, children }) {
   return (
-    // Root is the only positioned element; creates the full-screen stacking context
     <div
       className="relative min-h-dvh w-full bg-black overflow-hidden"
       style={{ isolation: "isolate" }}
@@ -13,7 +10,6 @@ export default function TheaterBackground({ bgUrl, children }) {
         className="absolute inset-0 h-full w-full object-cover select-none pointer-events-none"
       />
 
-      {/* global vignette so it stays dark */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{

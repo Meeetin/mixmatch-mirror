@@ -1,11 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
 
-/**
- * SpotlightOverlay (perfect circle)
- * - Uses radial-gradient(circle <size>) so it's never an ellipse.
- * - r can be "45%" (auto -> 45vmin), "40vmin", or "320px".
- * - Always calls onSettled (both flicker + steady).
- */
 export default function SpotlightOverlay({
   active,
   onSettled,
@@ -17,7 +11,7 @@ export default function SpotlightOverlay({
   tint = "255,238,200",  // warm white (r,g,b)
   exitDuration = 0.6,    // fade-out
 }) {
-  const circleSize = normalizeCircleSize(r); // -> "40vmin" if you pass "40%"
+  const circleSize = normalizeCircleSize(r); 
 
   const beam = `radial-gradient(circle ${circleSize} at ${center[0] * 100}% ${center[1] * 100}%,
     rgba(${tint},0.80) 0%,
@@ -29,11 +23,9 @@ export default function SpotlightOverlay({
     rgba(255,255,255,0.06) 38%,
     rgba(255,255,255,0.00) 70%)`;
 
-  // Keyframes that end at holdOpacity so there's no visible seam
   const flickerKeys = [0, 1, 0.18, 1, 0.42, 0.92, 0.28, holdOpacity];
   const flickerTimes = [0, 0.18, 0.30, 0.48, 0.62, 0.78, 0.88, 1];
 
-  // Simple steady fade when flicker is disabled
   const steadyKeys = [0, holdOpacity];
   const steadyTimes = [0, 1];
 
@@ -48,7 +40,6 @@ export default function SpotlightOverlay({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3, exit: { duration: exitDuration, ease: "easeOut" } }}
         >
-          {/* Main beam — lands exactly at holdOpacity */}
           <motion.div
             className="absolute inset-0"
             initial={{ opacity: 0 }}
@@ -58,11 +49,10 @@ export default function SpotlightOverlay({
               times: flicker ? flickerTimes : steadyTimes,
               ease: "easeInOut",
             }}
-            onAnimationComplete={onSettled} // call for both flicker & steady
+            onAnimationComplete={onSettled}
             style={{ background: beam, mixBlendMode: "screen", willChange: "opacity" }}
           />
 
-          {/* Soft bloom */}
           <motion.div
             className="absolute inset-0"
             initial={{ opacity: 0 }}
@@ -85,7 +75,6 @@ export default function SpotlightOverlay({
   );
 }
 
-/** Convert "45%" -> "45vmin" to guarantee a circle; pass through vmin/px. */
 function normalizeCircleSize(r) {
   if (typeof r !== "string") return "40vmin";
   const s = r.trim().toLowerCase();
@@ -93,9 +82,7 @@ function normalizeCircleSize(r) {
   if (s.endsWith("%")) {
     const n = parseFloat(s);
     if (!Number.isFinite(n)) return "40vmin";
-    // 1% of the smaller viewport side == 1vmin
     return `${n}vmin`;
   }
-  // fallback
   return "40vmin";
 }

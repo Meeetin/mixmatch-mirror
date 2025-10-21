@@ -3,10 +3,9 @@ import { getSocket } from "../../../../packages/shared/socket.js";
 
 const s = getSocket(import.meta.env.VITE_SERVER_URL);
 
-// keep payloads tiny so they fly smoothly over the wire
 const CANVAS_SIZE = 160;
 const BRUSH = 6;
-const COLORS = ["#F04452" /* crimson-500 */, "#F1C40F" /* gold-ish */, "#22D3EE" /* cyan-400 */];
+const COLORS = ["#F04452" , "#F1C40F", "#22D3EE"];
 const COOLDOWN_MS = 5000;
 const ACK_TIMEOUT_MS = 6000;
 
@@ -85,7 +84,6 @@ export default function EmoteDrawer({ code, open, onClose }) {
 
       const doSend = () => {
         const timer = setTimeout(() => {
-          // safety: never hang on "Sending…"
           setSending(false);
           console.warn("emote:send ack timed out");
         }, ACK_TIMEOUT_MS);
@@ -192,7 +190,6 @@ export default function EmoteDrawer({ code, open, onClose }) {
   );
 }
 
-// Tiny floating opener button you can place at the bottom of the Player
 export function EmoteOpener({ onOpen }) {
   return (
     <button
