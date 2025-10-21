@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-let s;
+let s; //Module-scoped let s memoizes one mutable Socket.IO connection, allowing reset and preventing duplicate sockets/listeners.
 
 export function getSocket(url) {
   if (typeof window !== "undefined" && window.__MIXMATCH_SOCKET__) {

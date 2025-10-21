@@ -40,7 +40,9 @@ function Hub() {
     const unsub = attachPlaybackController(useGame);
     return unsub;
   }, []);
-
+    const goHomeHard = useCallback(() => {
+    window.location.assign("/");
+    }, []);
   // Create room, but bounce to Spotify auth if needed
   const onCreate = useCallback(() => {
     if (!hasSpotifyToken()) {
@@ -198,9 +200,7 @@ function Hub() {
               </span>
             }
             headerRight={<StageBadge stage={s} />}
-            headerCenter={
-              <Link to="/"><Logo size="sm" /></Link>
-            }
+            headerCenter={<Logo size="sm" onClick={goHomeHard} />}
           >
             <div className="flex flex-col min-h-[70dvh]">
               <div className="grow">
@@ -273,7 +273,7 @@ function Hub() {
           <Shell
             title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
             headerRight={<StageBadge stage={s} seconds={seconds} />}
-            headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+            headerCenter={<Logo size="sm" onClick={goHomeHard} />}
             bodyHidden={questionStageHidden}
           >
             <StageCenter>
@@ -315,7 +315,7 @@ function Hub() {
           <Shell
             title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
             headerRight={<StageBadge stage={s} seconds={seconds} label="Reveal ends in" />}
-            headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+            headerCenter={<Logo size="sm" onClick={goHomeHard} />}
           >
             <StageCenter>
               {question?.type === "track-recognition" ? (
@@ -344,7 +344,7 @@ function Hub() {
           <Shell
             title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
             headerRight={<StageBadge stage={s} seconds={seconds} label="Next question in" />}
-            headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+            headerCenter={<Logo size="sm" onClick={goHomeHard} />}
           >
             <StageCenter>
               <LeaderboardBlock leaderboard={leaderboard} compact />
@@ -374,7 +374,7 @@ function Hub() {
           <Shell
             title={<code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>}
             headerRight={<StageBadge stage={s} />}
-            headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+            headerCenter={<Logo size="sm" onClick={goHomeHard} />}
           >
             <StageCenter>
               <LeaderboardBlock leaderboard={leaderboard} />
@@ -401,7 +401,7 @@ function Hub() {
         <Shell
           title={<>{s || "Hub"}</>}
           headerRight={<StageBadge stage={s} seconds={seconds} />}
-          headerCenter={<Link to="/"><Logo size="sm" /></Link>}
+          headerCenter={<Logo size="sm" onClick={goHomeHard} />}
         >
           <StageCenter>
             <Card>Unknown stage.</Card>

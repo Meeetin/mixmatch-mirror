@@ -79,16 +79,13 @@ export default function Player() {
     return () => clearTimeout(gateTimerRef.current);
   }, [stage, questionKey]);
 
-  /* ---------- Start from Player: reuse playAgain path (Hub reseeds via Spotify) currently not working, fix. ---------- */
+  /* ---------- Start from Player: reuse playAgain path (Hub reseeds via Spotify) NEEDS TO BE FIXED---------- */
   const hasPick = !!(getConfig()?.selectedPlaylistIDs?.length);
   const canStart = stage === "lobby" && hasPick;
 
   const onStartFromPlayer = useCallback(() => {
     playAgain((res) => {
-      if (!res?.ok) {
-        console.warn("[Player] playAgain(start) failed:", res);
-        
-      }
+      if (!res?.ok) console.warn("[Player] playAgain(start) failed:", res);
     });
   }, [playAgain]);
 
@@ -97,8 +94,12 @@ export default function Player() {
     if (stage !== "question") setPicked(null);
   }, [stage, questionKey]);
 
-  /* ========================= Renders ========================= */
+  /* ========================= Stage router ========================= */
+  /* ========================= Stage router ========================= */
+// Host-only continue flag
+const showContinue = isFirst && (stage === "reveal" || stage === "result");
 
+const renderMain = () => {
   // --- Join screen ---
   if (!code) {
     const onSubmit = (e) => {
@@ -116,7 +117,6 @@ export default function Player() {
           <Logo size="lg" />
         </div>
         <Card className="w-full max-w-sm mx-auto">
-          
           <h1 className="text-2xl font-semibold mb-3 font-display">Join game</h1>
           <form onSubmit={onSubmit} className="space-y-3">
             <Input
@@ -148,7 +148,7 @@ export default function Player() {
     return (
       <Screen>
         <Header
-          title={ 
+          title={
             <span className="inline-flex items-baseline gap-2">
               <span className="uppercase text-xs tracking-widest text-mist-300">Room</span>
               <code className="font-mono tracking-widest text-2xl">{code}</code>
@@ -162,17 +162,18 @@ export default function Player() {
             {players.length === 0 && <Muted>No players yet…</Muted>}
           </Card>
 
-         {/* isFirst ? (
+          {/* Start-from-player UI (optional)
+          {isFirst ? (
             <PrimaryButton
-              //onClick={onStartFromPlayer}
-              disabled={!canStart}
+              onClick={onStartFromPlayer}
+              disabled={!(stage === "lobby" && !!getConfig()?.selectedPlaylistIDs?.length)}
               className="w-full py-3 text-lg"
             >
               Start game
-            </PrimaryButton>    
+            </PrimaryButton>
           ) : (
             <Muted className="text-center">Waiting for the first player…</Muted>
-          )*/} 
+          )} */}
         </div>
       </Screen>
     );
@@ -211,172 +212,205 @@ export default function Player() {
   const opts = question?.options ?? [];
   const isText = question?.type === "track-recognition";
   const canAnswer = stage === "question";
-  const showContinue = isFirst && (stage === "reveal" || stage === "result");
-
-  let main = null;
+  const hide = stage === "question" && gateRef.current;
 
   if (stage === "question") {
-    const hide = gateRef.current;
-
-    if (hide) {
-      main = (
+    return (
+      <Screen>
+        <Header
+          title={<code className="font-mono tracking-widest text-xl">{code}</code>}
+          right={<StageBadge stage={stage} seconds={seconds} />}
+        />
         <Card title="Question">
-          <div className="text-sm text-mist-300 text-center">Preparing question…</div>
-        </Card>
-      );
-    } else {
-      main = (
-        <Card title="Question">
-          <div className="font-display text-lg leading-snug text-center text-balance mb-3">
-            {question?.prompt ?? "—"}
-          </div>
+          {hide ? (
+            <div className="text-sm text-mist-300 text-center">Preparing question…</div>
+          ) : (
+            <>
+              <div className="font-display text-lg leading-snug text-center text-balance mb-3">
+                {question?.prompt ?? "—"}
+              </div>
 
-      {isText ? (
-        <div className="flex items-stretch gap-2">
-          <input
-            type="text"
-            value={guess}
-            onChange={(e) => setGuess(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                if (!submittedGuess && canAnswer && guess.trim()) {
-                  submitTextAnswer(guess);
-                  setSubmittedGuess(true);
-                }
-              }
-            }}
-            disabled={!canAnswer || submittedGuess}
-            placeholder="Type the song title…"
-            className="flex-1 rounded-lg bg-ink-800/80 px-3 py-3 outline-none disabled:opacity-50"
-          />
-          <button
-            onClick={() => {
-              if (!submittedGuess && canAnswer && guess.trim()) {
-                submitTextAnswer(guess);
-                setSubmittedGuess(true);
-              }
-            }}
-            disabled={!canAnswer || submittedGuess || !guess.trim()}
-            className="rounded-lg px-4 py-3 bg-gold-500 font-medium hover:bg-gold-400 disabled:opacity-50"
-          >
-            Submit
-          </button>
-        </div>
-      ) : (
-        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
-          {opts.map((opt, i) => {
-            const disabled = !canAnswer || picked != null;
-            const pickedThis = picked === i;
-            return (
-              <button
-                key={i}
-                onClick={() => {
-                  if (disabled) return;
-                  setPicked(i);
-                  submitAnswer(i);
-                }}
-                disabled={disabled}
-                className={[
-                  "rounded-lg px-3 py-3 text-left",
-                  "bg-ink-800/80 hover:bg-ink-700/80 disabled:opacity-50",
-                  pickedThis ? "outline outline-2 outline-gold-400" : "",
-                ].join(" ")}
-              >
-                <div className="flex items-start gap-2">
-                  <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-ink-700 font-medium">
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                  <span className="leading-snug break-words">{opt}</span>
+              {isText ? (
+                <div className="flex items-stretch gap-2">
+                  <input
+                    type="text"
+                    value={guess}
+                    onChange={(e) => setGuess(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (!submittedGuess && canAnswer && guess.trim()) {
+                          submitTextAnswer(guess);
+                          setSubmittedGuess(true);
+                        }
+                      }
+                    }}
+                    disabled={!canAnswer || submittedGuess}
+                    placeholder="Type the song title…"
+                    className="flex-1 rounded-lg bg-ink-800/80 px-3 py-3 outline-none disabled:opacity-50"
+                  />
+                  <button
+                    onClick={() => {
+                      if (!submittedGuess && canAnswer && guess.trim()) {
+                        submitTextAnswer(guess);
+                        setSubmittedGuess(true);
+                      }
+                    }}
+                    disabled={!canAnswer || submittedGuess || !guess.trim()}
+                    className="rounded-lg px-4 py-3 bg-gold-500 font-medium hover:bg-gold-400 disabled:opacity-50"
+                  >
+                    Submit
+                  </button>
                 </div>
-              </button>
-            );
-          })}
-          {opts.length === 0 && <Muted>Waiting for the host…</Muted>}
-        </div>
-      )}
-
+              ) : (
+                <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+                  {opts.map((opt, i) => {
+                    const disabled = !canAnswer || picked != null;
+                    const pickedThis = picked === i;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (disabled) return;
+                          setPicked(i);
+                          submitAnswer(i);
+                        }}
+                        disabled={disabled}
+                        className={[
+                          "rounded-lg px-3 py-3 text-left",
+                          "bg-ink-800/80 hover:bg-ink-700/80 disabled:opacity-50",
+                          pickedThis ? "outline outline-2 outline-gold-400" : "",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-ink-700 font-medium">
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          <span className="leading-snug break-words">{opt}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {opts.length === 0 && <Muted>Waiting for the host…</Muted>}
+                </div>
+              )}
+            </>
+          )}
         </Card>
-      );
-    }
-  } else if (stage === "reveal" && question?.correctIndex != null) {
-    main = (
-      <Card title="Correct answer">
-        <RevealBars question={question} />
-      </Card>
-    );
-  } else if (stage === "reveal" && isText) {
-  const targetTitle = question?.trackMeta?.title || "";
-  const targetArtist = question?.trackMeta?.artist || "";
-  const answered = !!(submittedGuess || (guess && guess.trim()));
-  const correct = answered && isCloseEnough(guess || "", targetTitle || "");
 
-  main = (
-    <Card title={correct ? "Correct!" : answered ? "Incorrect!" : "Time's up"}>
-      <div className="text-center space-y-2">
-        {answered ? (
-          <div className="text-mist-400">
-            Your answer: <span className="font-medium text-mist-200">{guess || "—"}</span>
-          </div>
-        ) : (
-          <div className="text-mist-400">You didn’t answer.</div>
+        {code && (
+          <>
+            <EmoteOpener onOpen={() => setEmoteOpen(true)} />
+            <EmoteDrawer code={code} open={emoteOpen} onClose={() => setEmoteOpen(false)} />
+          </>
         )}
+      </Screen>
+    );
+  }
 
-        <div className="font-display text-xl">
-          Correct: <span className="font-semibold">{targetTitle || "—"}</span>
-          {targetArtist ? <span className="text-mist-300"> — {targetArtist}</span> : null}
-        </div>
+  if (stage === "reveal") {
+    const isMCQ = question?.correctIndex != null && !isText;
+    return (
+      <Screen>
+        <Header
+          title={<code className="font-mono tracking-widest text-xl">{code}</code>}
+          right={<StageBadge stage={stage} seconds={seconds} />}
+        />
+        {isMCQ ? (
+          <Card title="Correct answer">
+            <RevealBars question={question} />
+          </Card>
+        ) : (
+          (() => {
+            const targetTitle = question?.trackMeta?.title || "";
+            const targetArtist = question?.trackMeta?.artist || "";
+            const answered = !!(submittedGuess || (guess && guess.trim()));
+            const correct = answered && isCloseEnough(guess || "", targetTitle || "");
+            return (
+              <Card title={correct ? "Correct!" : answered ? "Incorrect!" : "Time's up"}>
+                <div className="text-center space-y-2">
+                  {answered ? (
+                    <div className="text-mist-400">
+                      Your answer: <span className="font-medium text-mist-200">{guess || "—"}</span>
+                    </div>
+                  ) : (
+                    <div className="text-mist-400">You didn’t answer.</div>
+                  )}
+                  <div className="font-display text-xl">
+                    Correct: <span className="font-semibold">{targetTitle || "—"}</span>
+                    {targetArtist ? <span className="text-mist-300"> — {targetArtist}</span> : null}
+                  </div>
+                  {correct ? (
+                    <div className="inline-block mt-1 rounded-md bg-emerald-700/30 px-3 py-1 text-emerald-300 text-sm">
+                      +1 point
+                    </div>
+                  ) : answered ? (
+                    <div className="inline-block mt-1 rounded-md bg-crimson-700/30 px-3 py-1 text-rose-300 text-sm">
+                      Close, but not correct
+                    </div>
+                  ) : null}
+                </div>
+              </Card>
+            );
+          })()
+        )}
+        {showContinue && (
+          <PrimaryButton onClick={advance} className="w-full mt-2">Continue</PrimaryButton>
+        )}
+        {code && (
+          <>
+            <EmoteOpener onOpen={() => setEmoteOpen(true)} />
+            <EmoteDrawer code={code} open={emoteOpen} onClose={() => setEmoteOpen(false)} />
+          </>
+        )}
+      </Screen>
+    );
+  }
 
-        {correct ? (
-          <div className="inline-block mt-1 rounded-md bg-emerald-700/30 px-3 py-1 text-emerald-300 text-sm">
-            +1 point
-          </div>
-        ) : answered ? (
-          <div className="inline-block mt-1 rounded-md bg-crimson-700/30 px-3 py-1 text-rose-300 text-sm">
-            Close, but not correct
-          </div>
-        ) : null}
-      </div>
-    </Card>
-  );
+  if (stage === "result") {
+    return (
+      <Screen>
+        <Header
+          title={<code className="font-mono tracking-widest text-xl">{code}</code>}
+          right={<StageBadge stage={stage} seconds={seconds} />}
+        />
+        <Card title="Scores">
+          <Leaderboard />
+        </Card>
+        {showContinue && (
+          <PrimaryButton onClick={advance} className="w-full mt-2">Continue</PrimaryButton>
+        )}
+        {code && (
+          <>
+            <EmoteOpener onOpen={() => setEmoteOpen(true)} />
+            <EmoteDrawer code={code} open={emoteOpen} onClose={() => setEmoteOpen(false)} />
+          </>
+        )}
+      </Screen>
+    );
+  }
 
-} else if (stage === "reveal" && question?.correctIndex != null) {
-  // MCQ reveal
-  main = (
-    <Card title="Correct answer">
-      <RevealBars question={question} />
-    </Card>
-  );
-
-} else if (stage === "result") {
-  main = (
-    <Card title="Scores">
-      <Leaderboard />
-    </Card>
-  );
-}
-
-
-
+  // Fallback
   return (
     <Screen>
       <Header
-        title={<code className="font-mono tracking-widest text-xl">{code}</code>}
+        title={<code className="font-mono tracking-widest text-xl">{code || "—"}</code>}
         right={<StageBadge stage={stage} seconds={seconds} />}
       />
-
-      {main}
-
-      {showContinue && (
-        <PrimaryButton onClick={advance} className="w-full mt-2">Continue</PrimaryButton>
-      )}
-
-      {code && (
-        <>
-          <EmoteOpener onOpen={() => setEmoteOpen(true)} />
-          <EmoteDrawer code={code} open={emoteOpen} onClose={() => setEmoteOpen(false)} />
-        </>
-      )}
+      <Card>Unknown stage.</Card>
     </Screen>
+  );
+};
+
+
+  //const showContinue = isFirst && (stage === "reveal" || stage === "result");
+
+  return (
+    <>
+      {renderMain()}
+      {/* {showContinue && (
+        <PrimaryButton onClick={advance} className="w-full mt-2">Continue</PrimaryButton>
+      )} */}
+    </>
   );
 }
 
@@ -556,6 +590,7 @@ function Leaderboard({ leaderboardHint = "" }) {
     </div>
   );
 }
+
 const LOGO_SRC = "/images/mixmatch-logo.png";
 
 function Logo({ size = "lg", onClick }) {
@@ -570,6 +605,7 @@ function Logo({ size = "lg", onClick }) {
     />
   );
 }
+
 /* ==================== Helpers ==================== */
 
 function friendlyJoinError(code) {
@@ -602,7 +638,7 @@ function levenshtein(a, b) {
   const m = a.length, n = b.length;
   if (!m) return n;
   if (!n) return m;
-  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  let prev = Array.from({ length: n + 1 }, (_, j) => j); //Pure function: no external state is read/modified, arguments are never mutated
   for (let i = 1; i <= m; i++) {
     const ai = a.charCodeAt(i - 1);
     const curr = [i];
@@ -627,7 +663,7 @@ function isCloseEnough(guessRaw, targetRaw, { maxEditFrac = 0.2, minJaccard = 0.
 
   const gs = new Set(guess.split(" ").filter(Boolean));
   const ts = new Set(target.split(" ").filter(Boolean));
-  let inter = 0; for (const t of gs) if (ts.has(t)) inter++;
+  let inter = 0; for (const t of gs) if (ts.has(t)) inter++; //mutation is confined
   const union = gs.size + ts.size - inter;
   const jacc = union ? inter / union : 0;
   return jacc >= minJaccard;
