@@ -1,4 +1,3 @@
-// server/routes/stats.js
 import express from "express";
 import { GameRound } from "../models/GameRound.js";
 
@@ -22,7 +21,7 @@ router.get("/summary", async (_req, res) => {
 
     res.json({ ok: true, results });
   } catch (err) {
-    console.error("❌ [getGameSummary] Failed:", err);
+    console.error("[getGameSummary] Failed:", err);
     res.status(500).json({ ok: false, error: "Failed to fetch stats" });
   }
 });
