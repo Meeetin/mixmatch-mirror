@@ -34,17 +34,17 @@ app.use("/media", express.static(MEDIA_DIR));
 
 /** ------------------ MongoDB connection ------------------ */
 if (!process.env.MONGO_URI) {
-  console.error("❌ MONGO_URI missing from environment");
+  console.error("MONGO_URI missing from environment");
 } else {
   console.log("Attempting MongoDB connection...");
   mongoose
     .connect(process.env.MONGO_URI, { dbName: "mixmatch" })
-    .then(() => console.log("✅ Connected to MongoDB Atlas"))
-    .catch((err) => console.error("❌ MongoDB connection error:", err));
+    .then(() => console.log("Connected to MongoDB Atlas"))
+    .catch((err) => console.error("MongoDB connection error:", err));
 }
 
-mongoose.connection.on("connected", () => console.log("🟢 MongoDB connected"));
-mongoose.connection.on("error", (err) => console.error("🔴 MongoDB error:", err));
+mongoose.connection.on("connected", () => console.log("MongoDB connected"));
+mongoose.connection.on("error", (err) => console.error("MongoDB error:", err));
 
 /** ------------------ Stats routes ------------------ */
 import statsRoutes from "./routes/stats.js";
