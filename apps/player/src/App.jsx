@@ -95,7 +95,6 @@ export default function Player() {
   }, [stage, questionKey]);
 
   /* ========================= Stage router ========================= */
-  /* ========================= Stage router ========================= */
 // Host-only continue flag
 const showContinue = isFirst && (stage === "reveal" || stage === "result");
 
