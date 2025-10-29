@@ -469,13 +469,17 @@ function StageCenter({ children }) {
 
 function Landing({ onCreate }) {
   // Where to send players (localhost or deployed URL temporarily hardcoded here)
+  /*
   const playerUrl = "http://localhost:5174/";
-  const goToPlayer = () => window.open(playerUrl, "_self");
+  const goToPlayer = () => window.open(playerUrl, "_self"); */
+  
+  const PLAYER_ORIGIN = (import.meta.env.VITE_PLAYER_ORIGIN || "").replace(/\/+$/,"");
+  const goToPlayer = () => window.location.assign(`${PLAYER_ORIGIN}/`);
 
   const [copied, setCopied] = useState(false);
   const copyJoinLink = async () => {
     try {
-      await navigator.clipboard.writeText(playerUrl);
+      await navigator.clipboard.writeText(PLAYER_ORIGIN);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {}
