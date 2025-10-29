@@ -19,7 +19,16 @@ const PORT = Number(process.env.PORT || 8080);
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: true, methods: ["GET", "POST"] },
+  cors: {
+    origin: [
+      true,
+      "https://mixmatch-mirror-hub.vercel.app",
+      "https://mixmatch-mirror-player.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:5174"
+    ],
+    methods: ["GET", "POST"]
+  },
 });
 
 // quick info + health
