@@ -20,8 +20,6 @@ const PORT = Number(process.env.PORT || 8080);
 const app = express();
 const server = http.createServer(app);
 
-import cors from "cors";
-
 app.use(cors({
   origin: function (origin, callback) {
     const allowedOrigins = [
