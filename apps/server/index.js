@@ -25,7 +25,8 @@ app.use(cors({
     "https://mixmatch-mirror-hub.vercel.app",
     "https://mixmatch-mirror-player.vercel.app",
     "http://localhost:5173",
-    "http://localhost:5174"
+    "http://localhost:5174",
+    "https://unpacific-abdiel-nonrevoltingly.ngrok-free.dev" // add your current ngrok domain
   ],
   methods: ["GET", "POST"],
   credentials: true
