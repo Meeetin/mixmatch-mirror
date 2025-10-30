@@ -20,17 +20,28 @@ const PORT = Number(process.env.PORT || 8080);
 const app = express();
 const server = http.createServer(app);
 
+import cors from "cors";
+
 app.use(cors({
-  origin: [
-    "https://mixmatch-mirror-hub.vercel.app",
-    "https://mixmatch-mirror-player.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "https://unpacific-abdiel-nonrevoltingly.ngrok-free.dev" // add your current ngrok domain
-  ],
-  methods: ["GET", "POST"],
-  credentials: true
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      "https://mixmatch-mirror-hub.vercel.app",
+      "https://mixmatch-mirror-player.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "https://unpacific-abdiel-nonrevoltingly.ngrok-free.dev"
+    ];
+    if (!origin) return callback(null, true); // allow server-to-server
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.log("❌ Blocked by CORS:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
 }));
+
+app.options("*", cors()); // handle preflight
 
 const io = new Server(server, {
   cors: {
