@@ -39,8 +39,6 @@ app.use(cors({
   credentials: true,
 }));
 
-app.options("*", cors()); // handle preflight
-
 const io = new Server(server, {
   cors: {
     origin: [
