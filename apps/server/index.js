@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { registerGameEngine } from "./engine/gameEngine.js";
 import { GameRound } from "./models/GameRound.js";
+import cors from "cors";
 
 /** ------------------ environment ------------------ */
 dotenv.config();
@@ -18,6 +19,18 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 8080);
 const app = express();
 const server = http.createServer(app);
+
+app.use(cors({
+  origin: [
+    "https://mixmatch-mirror-hub.vercel.app",
+    "https://mixmatch-mirror-player.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5174"
+  ],
+  methods: ["GET", "POST"],
+  credentials: true
+}));
+
 const io = new Server(server, {
   cors: {
     origin: [

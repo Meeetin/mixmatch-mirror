@@ -5,17 +5,26 @@ export default function GameHistory() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch("/api/stats/summary")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.ok && Array.isArray(data.results)) {
-          setResults(data.results);
-        }
-      })
-      .catch((err) => console.error("Failed to fetch stats:", err))
-      .finally(() => setLoading(false));
-  }, []);
+useEffect(() => {
+  // Use environment variable or fallback to your production backend
+  const API_BASE =
+    import.meta.env.VITE_API_URL || "https://mixmatch-mirror-server.onrender.com";
+
+  fetch(`${API_BASE}/api/stats/summary`)
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
+    .then((data) => {
+      if (data.ok && Array.isArray(data.results)) {
+        setResults(data.results);
+      } else {
+        console.warn("Unexpected data format:", data);
+      }
+    })
+    .catch((err) => console.error("Failed to fetch stats:", err))
+    .finally(() => setLoading(false));
+}, []);
 
   if (loading) {
     return (
