@@ -404,7 +404,7 @@ function Hub() {
           headerCenter={<Logo size="sm" onClick={goHomeHard} />}
         >
           <StageCenter>
-            <Card>Unknown stage.</Card>
+            <Card>Wait...</Card>
           </StageCenter>
         </Shell>
       </TheaterBackground>
