@@ -13,7 +13,7 @@ export const makeGameStore = (serverUrl) => {
       firstPlayerId: null,     // first player can Start/Continue
       selfId: s.connected ? s.id : null, // set immediately if already connected
       stage: "idle",           // idle | lobby | question | reveal | result | gameover | locked (player-only)
-      question: null,          // { id, prompt, options[], correctIndex? }
+      question: null,          // { id, prompt, options[], correctgit ? }
       seconds: 0,
       deadline: null,
       revealUntil: null,
