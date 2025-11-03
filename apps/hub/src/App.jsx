@@ -187,56 +187,73 @@ function Hub() {
       return <Landing onCreate={onCreate} />;
     }
 
-    if (s === "lobby") {
-      const hasPick = !!(getConfig()?.selectedPlaylistIDs?.length);
+        if (s === "lobby") {
+      const cfg = getConfig();
+      const selectedCount = Array.isArray(cfg?.selectedPlaylistIDs) ? cfg.selectedPlaylistIDs.length : 0;
+      const playerCount = players.length;
+
+      const missingReasons = [];
+      if (!code) missingReasons.push("Create a room");
+      if (playerCount < 1) missingReasons.push("Need ≥1 player");
+      if (selectedCount === 0) missingReasons.push("Pick ≥1 genre/decade");
+
+      const canStart = !!(code && playerCount >= 1 && selectedCount > 0);
+
       return (
         <TheaterBackground bgUrl={THEATRE_BG}>
           <Shell
             wide
-            title={
-              <span className="inline-flex items-baseline gap-2">
-                <span className="uppercase text-xs tracking-widest text-mist-400">Room Code</span>
-                <code className="font-mono tracking-widest text-3xl md:text-4xl">{code || "—"}</code>
-              </span>
-            }
-            headerRight={<StageBadge stage={s} />}
+            title={<span className="uppercase text-xs tracking-widest text-mist-400">‎ </span>}
+            //headerRight={<StageBadge stage={s} />}
             headerCenter={<Logo size="sm" onClick={goHomeHard} />}
           >
-            <div className="flex flex-col min-h-[70dvh]">
-              <div className="grow">
-                <div className="mx-auto w-full max-w-[900px] grid gap-2 items-start grid-cols-1 md:grid-cols-2">
+            <RoomCodeHero code={code} />
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              <div className="space-y-4">
+                {players.length === 0 ? (
+                  <EmptyLobbyFill code={code} />
+                ) : (
                   <Card title={`Players (${players.length})`}>
                     <PlayerGrid players={players} hostId={hostId} />
-                    {players.length === 0 && <EmptyNote>No players yet…</EmptyNote>}
                   </Card>
-                  <Card title="Game settings">
-                    <div className="space-y-4 w-full">
-                      <LobbySettings />
-                    </div>
-                  </Card>
-                </div>
+                )}
               </div>
 
-              <div className="mt-4">
-                <div className="w-full flex justify-center">
-                  <PrimaryButton
-                    onClick={onStart}
-                    disabled={!(code && players.length >= 1 && getConfig()?.selectedPlaylistIDs?.length)}
-                    className="text-2xl md:text-3xl px-8 md:px-10 py-4 md:py-5 rounded-3xl shadow-xl shadow-black/30"
-                  >
-                    Start game
-                  </PrimaryButton>
-                </div>
-
-                <div className="w-full mt-2">
-                  <GameHistory />
-                </div>
+              <div className="space-y-4">
+                <Card title="Game settings">
+                  <div className="space-y-4 w-full">
+                    <LobbySettings />
+                  </div>
+                </Card>
               </div>
             </div>
+
+            <div className="mt-6 text-center">
+              <PrimaryButton
+                onClick={onStart}
+                disabled={!canStart}
+                className="text-2xl md:text-3xl px-8 md:px-10 py-4 md:py-5 rounded-3xl shadow-xl shadow-black/30"
+                aria-disabled={!canStart}
+                aria-describedby={!canStart ? "start-requirements" : undefined}
+              >
+                Start game
+              </PrimaryButton>
+
+              {!canStart && <RequirementsHint id="start-requirements" reasons={missingReasons} />}
+            </div>
+
+            <div className="mt-6">
+              <GameHistory />
+            </div>
           </Shell>
+
+         
+          <EmoteStream />
         </TheaterBackground>
       );
     }
+
 
     if (s === "question") {
       const shouldAnimateCurtains = curtainRunning;
@@ -425,7 +442,7 @@ function Shell({
   children,
   headerRight,
   wide = false,
-  title = <>Hub</>,
+  title = <>-</>,
   bodyHidden = false,
   headerCenter = null,
 }) {
@@ -772,6 +789,57 @@ function LeaderboardBlock({ leaderboard, compact = false }) {
     </Card>
   );
 }
+function RoomCodeHero({ code }) {
+  return (
+    <div className="mt-6 md:mt-8 flex items-end justify-between gap-3">
+      <div>
+        <div className="uppercase text-xs tracking-widest text-mist-400">Room code</div>
+        <div className="flex items-end gap-2">
+          <code className="font-mono text-5xl md:text-7xl tracking-widest">{code || "—"}</code>
+         
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyLobbyFill({ code }) {
+  const PLAYER_ORIGIN = (import.meta.env.VITE_PLAYER_ORIGIN || "").replace(/\/+$/,"");
+  return (
+    <div id="join-guide" className="w-full rounded-3xl bg-ink-900/60 ring-1 ring-white/10 p-5 md:p-7 grid md:grid-cols-1 gap-5 items-center">
+      <div className="space-y-3">
+        
+        <ol className="text-mist-200 space-y-1 text-sm md:text-base">
+          <li>1) Open <b>{PLAYER_ORIGIN || "Player site"}</b> on your phone</li>
+          <li>2) Enter code <b className="font-mono">{code || "—"}</b></li>
+          <li>3) Pick a name</li>
+          <li>4) Join game</li>
+          <li>5) Wait for host to start the game</li>
+        </ol>
+      </div>
+
+     
+    </div>
+  );
+}
+
+function RequirementsHint({ id, reasons = [] }) {
+  if (!reasons.length) return null;
+  return (
+    <div id={id} className="w-full text-center mt-2" aria-live="polite">
+      <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-ink-900/70 ring-1 ring-white/10 px-3 py-2">
+        {reasons.map((r, i) => (
+          <span
+            key={i}
+            className="text-xs md:text-sm px-2 py-1 rounded-full bg-crimson-900/40 ring-1 ring-crimson-700/60 text-crimson-200"
+          >
+            {r}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const LOGO_SRC = "/images/mixmatch-logo.png";
 
@@ -790,24 +858,85 @@ function Logo({ size = "lg", onClick }) {
 
 /* ============ Player list ============ */
 
-function PlayerGrid({ players, hostId }) {
+function PlayerGrid({ players, hostId, maxVisible = 8 }) {
+  const overflow = Math.max(0, players.length - maxVisible);
+  const showCount = overflow > 0 ? maxVisible - 1 : players.length;
+
   return (
-    <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
-      {players.map((p) => (
+    <ul
+      className="
+        mx-auto w-full max-w-2xl
+        grid grid-cols-1 sm:grid-cols-2
+        gap-3
+      "
+    >
+      {players.slice(0, showCount).map((p) => {
+        const initial = (p.name || "?").slice(0, 1).toUpperCase();
+        const isHost = p.id === hostId;
+
+        return (
+          <li
+            key={p.id}
+            className="
+              flex items-center gap-4
+              rounded-2xl bg-ink-800/80 ring-1 ring-white/10
+              px-5 py-4
+              shadow-md shadow-black/20
+              min-h-[84px]
+            "
+            title={p?.name || ""}
+          >
+            <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-ink-700 grid place-items-center font-semibold text-base md:text-lg shrink-0">
+              {initial}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="block font-medium text-lg md:text-xl leading-snug truncate
+                             max-w-[9rem] sm:max-w-[10rem] md:max-w-[12rem]"
+                  title={p?.name || ""}
+                >
+                  {p.name}
+                </span>
+
+                {isHost && (
+                  <span className="shrink-0 align-middle text-[10px] px-1.5 py-0.5 rounded bg-gold-500/20 ring-1 ring-gold-400/40 text-gold-200">
+                    HOST
+                  </span>
+                )}
+              </div>
+            </div>
+          </li>
+        );
+      })}
+
+      {overflow > 0 && (
         <li
-          key={p.id}
-          className="rounded-lg bg-ink-800/80 px-3 py-2 flex items-center justify-between"
+          className="
+            flex items-center gap-4 justify-start
+            rounded-2xl bg-ink-800/80 ring-1 ring-white/10
+            px-5 py-4
+            shadow-md shadow-black/20
+            min-h-[84px]
+          "
+          aria-label={`and ${overflow} more`}
+          title={`${overflow} more`}
         >
-          <span className="truncate max-w-[20ch] md:max-w-none">
-            {p.name}
-            {p.id === hostId ? " (host)" : ""}
-          </span>
-          <span className="text-mist-300 font-mono tabular-nums">{p.score ?? 0}</span>
+          <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-ink-700 grid place-items-center font-semibold text-base md:text-lg shrink-0">
+            +{overflow}
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="block text-mist-300 text-base md:text-lg"></span>
+          </div>
         </li>
-      ))}
+      )}
     </ul>
   );
 }
+
+
+
 
 export default function App() {
   return (

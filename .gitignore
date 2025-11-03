@@ -18,3 +18,4 @@ Thumbs.db
 .env.*.local
 !.env.example
 share.zip
+TODO.txt
