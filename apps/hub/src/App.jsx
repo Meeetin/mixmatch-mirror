@@ -32,9 +32,9 @@ function Hub() {
     seedTracks, setTrackList,
   } = useGame();
 
-  /* ---------------- Audio  ---------------- */
   const audioRef = useRef(null);
   const [autoplayReady, setAutoplayReady] = useState(false);
+  const [showCodeInHeader, setShowCodeInHeader] = useState(false);
 
   useEffect(() => {
     const unsub = attachPlaybackController(useGame);
@@ -187,72 +187,85 @@ function Hub() {
       return <Landing onCreate={onCreate} />;
     }
 
-        if (s === "lobby") {
-      const cfg = getConfig();
-      const selectedCount = Array.isArray(cfg?.selectedPlaylistIDs) ? cfg.selectedPlaylistIDs.length : 0;
-      const playerCount = players.length;
+      if (s === "lobby") {
+  const cfg = getConfig();
+  const selectedCount = Array.isArray(cfg?.selectedPlaylistIDs) ? cfg.selectedPlaylistIDs.length : 0;
+  const playerCount = players.length;
 
-      const missingReasons = [];
-      if (!code) missingReasons.push("Create a room");
-      if (playerCount < 1) missingReasons.push("Need ≥1 player");
-      if (selectedCount === 0) missingReasons.push("Pick ≥1 genre/decade");
+  const missingReasons = [];
+  if (!code) missingReasons.push("Create a room");
+  if (playerCount < 1) missingReasons.push("Need ≥1 player");
+  if (selectedCount === 0) missingReasons.push("Pick ≥1 genre/decade");
 
-      const canStart = !!(code && playerCount >= 1 && selectedCount > 0);
+  const canStart = !!(code && playerCount >= 1 && selectedCount > 0);
 
-      return (
-        <TheaterBackground bgUrl={THEATRE_BG}>
-          <Shell
-            wide
-            title={<span className="uppercase text-xs tracking-widest text-mist-400">‎ </span>}
-            //headerRight={<StageBadge stage={s} />}
-            headerCenter={<Logo size="sm" onClick={goHomeHard} />}
-          >
-            <RoomCodeHero code={code} />
+  const headerTitle = showCodeInHeader
+    ? <code className="font-mono tracking-widest text-xl md:text-2xl">{code || "—"}</code>
+    : <span className="uppercase text-xs tracking-widest text-mist-400">‎ </span>;
 
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div className="space-y-4">
-                {players.length === 0 ? (
-                  <EmptyLobbyFill code={code} />
-                ) : (
-                  <Card title={`Players (${players.length})`}>
-                    <PlayerGrid players={players} hostId={hostId} />
-                  </Card>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <Card title="Game settings">
-                  <div className="space-y-4 w-full">
-                    <LobbySettings />
-                  </div>
+  return (
+    <TheaterBackground bgUrl={THEATRE_BG}>
+      <Shell
+        wide
+        title={headerTitle}
+        headerCenter={<Logo size="sm" onClick={goHomeHard} />}
+      >
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          <div className="space-y-4">
+            {players.length === 0 ? (
+              <>
+                <EmptyLobbyFill code={code} />
+                <RoomCodeFooter code={code} />
+              </>
+            ) : (
+              <>
+                <Card title={`Players (${players.length})`}>
+                  <PlayerGrid
+                    players={players}
+                    hostId={hostId}
+                    maxVisible={8}
+                    onOverflowChange={(isOverflow) => setShowCodeInHeader(!!isOverflow)}
+                  />
                 </Card>
+
+                {!showCodeInHeader && <RoomCodeFooter code={code} />}
+              </>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <Card title="Game settings">
+              <div className="space-y-4 w-full">
+                <LobbySettings />
               </div>
-            </div>
+            </Card>
+          </div>
+        </div>
 
-            <div className="mt-6 text-center">
-              <PrimaryButton
-                onClick={onStart}
-                disabled={!canStart}
-                className="text-2xl md:text-3xl px-8 md:px-10 py-4 md:py-5 rounded-3xl shadow-xl shadow-black/30"
-                aria-disabled={!canStart}
-                aria-describedby={!canStart ? "start-requirements" : undefined}
-              >
-                Start game
-              </PrimaryButton>
+        <div className="mt-6 text-center">
+          <PrimaryButton
+            onClick={onStart}
+            disabled={!canStart}
+            className="text-2xl md:text-3xl px-8 md:px-10 py-4 md:py-5 rounded-3xl shadow-xl shadow-black/30"
+            aria-disabled={!canStart}
+            aria-describedby={!canStart ? "start-requirements" : undefined}
+          >
+            Start game
+          </PrimaryButton>
 
-              {!canStart && <RequirementsHint id="start-requirements" reasons={missingReasons} />}
-            </div>
+          {!canStart && <RequirementsHint id="start-requirements" reasons={missingReasons} />}
+        </div>
 
-            <div className="mt-6">
-              <GameHistory />
-            </div>
-          </Shell>
+        <div className="mt-6">
+          <GameHistory />
+        </div>
+      </Shell>
 
-         
-          <EmoteStream />
-        </TheaterBackground>
-      );
-    }
+      <EmoteStream />
+    </TheaterBackground>
+  );
+}
+
 
 
     if (s === "question") {
@@ -823,6 +836,22 @@ function EmptyLobbyFill({ code }) {
   );
 }
 
+function RoomCodeFooter({ code }) {
+  if (!code) return null;
+  return (
+    <div className="w-full">
+      <div className="rounded-2xl bg-ink-900/60 ring-1 ring-white/10 px-4 py-3 text-center">
+        <div className="uppercase text-[10px] tracking-widest text-mist-400">Room code</div>
+        <div className="mt-1 inline-flex items-end gap-2">
+          <code className="font-mono text-5xl md:text-6xl tracking-widest">{code}</code>
+          
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function RequirementsHint({ id, reasons = [] }) {
   if (!reasons.length) return null;
   return (
@@ -858,9 +887,14 @@ function Logo({ size = "lg", onClick }) {
 
 /* ============ Player list ============ */
 
-function PlayerGrid({ players, hostId, maxVisible = 8 }) {
+function PlayerGrid({ players, hostId, maxVisible = 8, onOverflowChange }) {
   const overflow = Math.max(0, players.length - maxVisible);
   const showCount = overflow > 0 ? maxVisible - 1 : players.length;
+
+  // Inform parent if we are overflowing (so it can move the code to header)
+  useEffect(() => {
+    if (typeof onOverflowChange === "function") onOverflowChange(overflow > 0);
+  }, [overflow, onOverflowChange]);
 
   return (
     <ul
@@ -894,7 +928,7 @@ function PlayerGrid({ players, hostId, maxVisible = 8 }) {
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className="block font-medium text-lg md:text-xl leading-snug truncate
-                             max-w-[9rem] sm:max-w-[10rem] md:max-w-[12rem]"
+                             max-w-[8.5rem] sm:max-w-[9.5rem] md:max-w-[11rem]"
                   title={p?.name || ""}
                 >
                   {p.name}
@@ -927,13 +961,14 @@ function PlayerGrid({ players, hostId, maxVisible = 8 }) {
             +{overflow}
           </div>
           <div className="flex-1 min-w-0">
-            <span className="block text-mist-300 text-base md:text-lg"></span>
+            <span className="block text-mist-300 text-base md:text-lg">more</span>
           </div>
         </li>
       )}
     </ul>
   );
 }
+
 
 
 
